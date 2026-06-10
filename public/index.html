@@ -6,39 +6,39 @@
   <title>Binance Pay Gateway</title>
   <style>
     *{box-sizing:border-box;margin:0;padding:0}
-    :root{--bg:#0a0b0d;--card:#13151a;--card2:#0d0f13;--border:#1e2128;--border2:#2a2e38;--gold:#f0b90b;--gold-dim:#c79a08;--txt:#e8eaed;--muted:#7a808c;--muted2:#565c68}
+    :root{--bg:#0a0c14;--card:#151a26;--card2:#0f131d;--border:#222838;--border2:#2d3548;--gold:#8b7cff;--gold2:#22d3ee;--gold-dim:#6d5ee0;--txt:#eceef4;--muted:#828aa0;--muted2:#5a6178}
     html{scroll-behavior:smooth}
-    body{font-family:'Inter',-apple-system,BlinkMacSystemFont,'Segoe UI',system-ui,sans-serif;background:var(--bg);color:var(--txt);min-height:100vh;-webkit-font-smoothing:antialiased;background-image:radial-gradient(circle at 50% -20%,rgba(240,185,11,.06),transparent 60%)}
-    ::selection{background:rgba(240,185,11,.25)}
+    body{font-family:'Inter',-apple-system,BlinkMacSystemFont,'Segoe UI',system-ui,sans-serif;background:var(--bg);color:var(--txt);min-height:100vh;-webkit-font-smoothing:antialiased;background-image:radial-gradient(circle at 15% -10%,rgba(139,124,255,.10),transparent 45%),radial-gradient(circle at 85% 5%,rgba(34,211,238,.07),transparent 45%)}
+    ::selection{background:rgba(139,124,255,.3)}
     ::-webkit-scrollbar{width:10px;height:10px}
     ::-webkit-scrollbar-track{background:transparent}
     ::-webkit-scrollbar-thumb{background:#2a2e38;border-radius:6px;border:2px solid var(--bg)}
     ::-webkit-scrollbar-thumb:hover{background:#3a3f4b}
     .topbar{position:sticky;top:0;z-index:20;background:rgba(13,15,19,.8);backdrop-filter:blur(12px);border-bottom:1px solid var(--border);padding:14px 24px;display:flex;align-items:center;justify-content:space-between}
     .topbar-left{display:flex;align-items:center;gap:12px}
-    .topbar .logo-badge{display:flex;align-items:center;justify-content:center;width:34px;height:34px;border-radius:9px;background:linear-gradient(135deg,#f0b90b,#b8860b);box-shadow:0 2px 12px rgba(240,185,11,.3)}
-    .topbar h1{font-size:16px;font-weight:700;letter-spacing:-.01em;background:linear-gradient(90deg,#fff,#c4c8d0);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text}
+    .topbar .logo-badge{display:flex;align-items:center;justify-content:center;width:34px;height:34px;border-radius:10px;background:linear-gradient(135deg,#8b7cff,#22d3ee);box-shadow:0 2px 16px rgba(139,124,255,.45)}
+    .topbar h1{font-size:16px;font-weight:700;letter-spacing:-.01em;background:linear-gradient(90deg,#fff,#aab2c8);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text}
     .topbar a{font-size:13px;font-weight:500;color:var(--muted);text-decoration:none;padding:7px 14px;border:1px solid var(--border2);border-radius:8px;transition:all .2s}
-    .topbar a:hover{color:var(--gold);border-color:var(--gold);background:rgba(240,185,11,.06)}
+    .topbar a:hover{color:var(--gold);border-color:var(--gold);background:rgba(139,124,255,.08)}
     .container{max-width:920px;margin:0 auto;padding:28px 18px 60px;display:grid;gap:18px}
     .card{background:linear-gradient(180deg,var(--card),var(--card2));border:1px solid var(--border);border-radius:16px;padding:22px;box-shadow:0 1px 0 rgba(255,255,255,.02) inset,0 8px 24px rgba(0,0,0,.25);animation:rise .4s ease backwards}
     .card:nth-child(2){animation-delay:.04s}.card:nth-child(3){animation-delay:.08s}.card:nth-child(4){animation-delay:.12s}.card:nth-child(5){animation-delay:.16s}
     @keyframes rise{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:none}}
     .card h2{display:flex;align-items:center;gap:9px;font-size:12.5px;font-weight:700;color:var(--gold);margin-bottom:18px;text-transform:uppercase;letter-spacing:.08em}
-    .card h2::before{content:'';width:3px;height:14px;border-radius:2px;background:linear-gradient(180deg,#f0b90b,#b8860b)}
+    .card h2::before{content:'';width:3px;height:14px;border-radius:2px;background:linear-gradient(180deg,#8b7cff,#22d3ee)}
     .form-grid{display:grid;grid-template-columns:1fr 1fr;gap:14px}
     .form-grid.three{grid-template-columns:1fr 1fr 1fr}
     .field{display:flex;flex-direction:column;gap:7px}
     .field label{font-size:11.5px;color:var(--muted);font-weight:600;letter-spacing:.02em}
     .field input{background:#0a0c10;border:1px solid var(--border2);border-radius:9px;padding:11px 13px;color:var(--txt);font-size:13.5px;outline:none;transition:all .18s}
     .field input::placeholder{color:#444a55}
-    .field input:focus{border-color:var(--gold);box-shadow:0 0 0 3px rgba(240,185,11,.12);background:#0d0f13}
+    .field input:focus{border-color:var(--gold);box-shadow:0 0 0 3px rgba(139,124,255,.18);background:#0d111b}
     .btn{padding:10px 18px;border-radius:9px;border:1px solid transparent;font-size:13px;font-weight:600;cursor:pointer;transition:all .18s;letter-spacing:.01em}
     .btn:active{transform:translateY(1px)}
-    .btn-yellow{background:linear-gradient(135deg,#f0b90b,#d4a40a);color:#000;box-shadow:0 4px 14px rgba(240,185,11,.25)}
-    .btn-yellow:hover{box-shadow:0 6px 20px rgba(240,185,11,.4);filter:brightness(1.06)}
-    .btn-outline{background:#15181e;color:#b4bac4;border-color:var(--border2)}
-    .btn-outline:hover{color:var(--gold);border-color:var(--gold);background:rgba(240,185,11,.06)}
+    .btn-yellow{background:linear-gradient(135deg,#8b7cff,#22d3ee);color:#0a0c14;box-shadow:0 4px 16px rgba(139,124,255,.3)}
+    .btn-yellow:hover{box-shadow:0 6px 22px rgba(139,124,255,.5);filter:brightness(1.08)}
+    .btn-outline{background:#161c28;color:#b4bac4;border-color:var(--border2)}
+    .btn-outline:hover{color:var(--gold);border-color:var(--gold);background:rgba(139,124,255,.08)}
     .btn-green{background:linear-gradient(135deg,#16a34a,#15803d);color:#fff;box-shadow:0 4px 14px rgba(22,163,74,.25)}
     .btn-green:hover{box-shadow:0 6px 20px rgba(22,163,74,.4);filter:brightness(1.08)}
     .btn-row{display:flex;gap:10px;margin-top:14px;flex-wrap:wrap;align-items:center}
@@ -53,8 +53,8 @@
     .inv-row:first-child{padding-top:2px}
     .inv-label{color:var(--muted);font-size:12px;font-weight:500}
     .inv-value{color:var(--txt);font-family:'SF Mono','JetBrains Mono',ui-monospace,monospace;font-size:12.5px;word-break:break-all;text-align:right;max-width:65%}
-    .inv-value.highlight{color:var(--gold);font-weight:700;font-size:17px;text-shadow:0 0 16px rgba(240,185,11,.3)}
-    .pay-option{background:linear-gradient(180deg,#0d0f13,#0a0c10);border:1px solid var(--border2);border-radius:12px;padding:15px;margin-top:10px;transition:border .2s}
+    .inv-value.highlight{color:var(--gold);font-weight:700;font-size:17px;text-shadow:0 0 18px rgba(139,124,255,.45)}
+    .pay-option{background:linear-gradient(180deg,#11151f,#0d111b);border:1px solid var(--border2);border-radius:12px;padding:15px;margin-top:10px;transition:border .2s}
     .pay-option:hover{border-color:#363b46}
     .pay-option .method-label{font-size:10.5px;font-weight:700;text-transform:uppercase;letter-spacing:.1em;color:var(--gold);margin-bottom:10px}
     .copyable{cursor:pointer;transition:color .18s;border-radius:4px}
@@ -63,13 +63,13 @@
     .alert{padding:12px 15px;border-radius:10px;font-size:13px;margin-top:14px;line-height:1.45;animation:rise .3s ease}
     .alert-error{background:rgba(239,68,68,.1);border:1px solid rgba(239,68,68,.3);color:#f87171}
     .alert-success{background:rgba(34,197,94,.1);border:1px solid rgba(34,197,94,.3);color:#4ade80}
-    .alert-info{background:rgba(240,185,11,.1);border:1px solid rgba(240,185,11,.3);color:var(--gold)}
-    .spinner{display:inline-block;width:14px;height:14px;border:2px solid rgba(240,185,11,.25);border-top-color:var(--gold);border-radius:50%;animation:spin .65s linear infinite;vertical-align:-2px;margin-right:7px}
+    .alert-info{background:rgba(139,124,255,.1);border:1px solid rgba(139,124,255,.3);color:var(--gold)}
+    .spinner{display:inline-block;width:14px;height:14px;border:2px solid rgba(139,124,255,.25);border-top-color:var(--gold);border-radius:50%;animation:spin .65s linear infinite;vertical-align:-2px;margin-right:7px}
     @keyframes spin{to{transform:rotate(360deg)}}
     .list-header{display:flex;justify-content:space-between;align-items:center;margin-bottom:16px}
     .list-header h2{margin-bottom:0}
     .inv-list-item{display:flex;justify-content:space-between;align-items:center;padding:13px 16px;background:#0a0c10;border:1px solid var(--border);border-radius:11px;margin-bottom:9px;cursor:pointer;transition:all .18s}
-    .inv-list-item:hover{border-color:var(--gold);background:#0d0f13;transform:translateX(2px)}
+    .inv-list-item:hover{border-color:var(--gold);background:#11151f;transform:translateX(2px)}
     .inv-list-left{display:flex;flex-direction:column;gap:4px}
     .inv-list-id{font-family:ui-monospace,monospace;font-size:11px;color:var(--muted2)}
     .inv-list-amount{font-size:14.5px;font-weight:700;color:var(--txt)}
@@ -83,7 +83,7 @@
 <div class="topbar">
   <div class="topbar-left">
     <svg width="22" height="22" viewBox="0 0 24 24" fill="none">
-      <path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5" stroke="#f0b90b" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+      <path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5" stroke="#0a0c14" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
     </svg>
     <h1>Binance Pay Gateway</h1>
   </div>
@@ -265,14 +265,14 @@ async function debugOverview(){
   el.innerHTML='<div class="alert alert-info"><span class="spinner"></span>Mengambil semua isi akun (10-20 detik)...</div>';
   const {ok,data}=await req('/debug/overview',{method:'POST',body:JSON.stringify({days:30})});
   if(!ok){el.innerHTML='<div class="alert alert-error">'+(data.error||'Error')+'</div>';return;}
-  const ic={PAY:'#f0b90b',DEPOSIT:'#22c55e',WITHDRAW:'#ef4444',CONVERT:'#60a5fa',DIVIDEN:'#a78bfa'};
+  const ic={PAY:'#8b7cff',DEPOSIT:'#22c55e',WITHDRAW:'#ef4444',CONVERT:'#22d3ee',DIVIDEN:'#c084fc'};
   const balHtml=data.balances.length===0?'<div class="empty-state">Tidak ada saldo</div>':data.balances.map(b=>'<div class="inv-row"><span class="inv-label">'+b.asset+'</span><span class="inv-value">'+b.free+(parseFloat(b.locked)>0?' (locked: '+b.locked+')':'')+'</span></div>').join('');
   const tlHtml=data.timeline.length===0?'<div class="empty-state">Tidak ada aktivitas dalam '+data.daysBack+' hari</div>':data.timeline.map(t=>'<div class="inv-row"><span class="inv-label"><span style="color:'+(ic[t.type]||'#888')+';font-weight:600">'+t.type+'</span> &nbsp; '+new Date(t.time).toLocaleString('id-ID')+(t.network?' &nbsp; '+t.network:'')+'</span><span class="inv-value">'+t.amount+' '+t.asset+'</span></div>').join('');
   const failed=Object.entries(data.sources).filter(([k,v])=>!v).map(([k])=>k);
   const warn=failed.length?'<div class="alert alert-error">Gagal ambil: '+failed.join(', ')+'</div>':'';
   el.innerHTML='<div class="alert alert-success">Akun '+(data.accountType||'')+' — '+data.balances.length+' aset, '+data.timeline.length+' aktivitas ('+data.daysBack+' hari)</div>'+warn+
-    '<div class="method-label" style="margin:12px 0 4px;color:#f0b90b">SALDO</div><div class="invoice-card">'+balHtml+'</div>'+
-    '<div class="method-label" style="margin:12px 0 4px;color:#f0b90b">TIMELINE AKTIVITAS</div><div class="invoice-card">'+tlHtml+'</div>';
+    '<div class="method-label" style="margin:12px 0 4px;color:#8b7cff">SALDO</div><div class="invoice-card">'+balHtml+'</div>'+
+    '<div class="method-label" style="margin:12px 0 4px;color:#8b7cff">TIMELINE AKTIVITAS</div><div class="invoice-card">'+tlHtml+'</div>';
 }
 async function debugDeposit(){
   const el=document.getElementById('debugResult');
