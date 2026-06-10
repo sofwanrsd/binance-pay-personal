@@ -1,6 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import Dashboard from './components/Dashboard.jsx';
 import Docs from './components/Docs.jsx';
+import Tutorial from './components/Tutorial.jsx';
+import PrivacyPopup from './components/PrivacyPopup.jsx';
 
 export default function App() {
   const [path, setPath] = useState(window.location.pathname);
@@ -18,9 +20,12 @@ export default function App() {
   };
 
   const isDocs = path.startsWith('/docs');
+  const isTutorial = path.startsWith('/tutorial');
+  const isDash = !isDocs && !isTutorial;
 
   return (
     <>
+      <PrivacyPopup />
       <div className="topbar">
         <div className="topbar-left">
           <span className="logo-badge">
@@ -32,12 +37,13 @@ export default function App() {
           <h1>Binance Pay Gateway</h1>
         </div>
         <nav className="topnav">
-          <a className={`nav ${!isDocs ? 'active' : ''}`} onClick={() => nav('/')}>Dashboard</a>
+          <a className={`nav ${isDash ? 'active' : ''}`} onClick={() => nav('/')}>Dashboard</a>
+          <a className={`nav ${isTutorial ? 'active' : ''}`} onClick={() => nav('/tutorial')}>Tutorial</a>
           <a className={`nav ${isDocs ? 'active' : ''}`} onClick={() => nav('/docs')}>API Docs</a>
         </nav>
       </div>
 
-      {isDocs ? <Docs /> : <Dashboard />}
+      {isDocs ? <Docs /> : isTutorial ? <div className="container"><Tutorial /></div> : <Dashboard />}
     </>
   );
 }

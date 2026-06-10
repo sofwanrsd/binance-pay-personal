@@ -231,6 +231,120 @@
           "429": { "description": "Terlalu banyak percobaan" }
         }
       }
+    },
+    "/debug/pay-history": {
+      "post": {
+        "summary": "Riwayat Binance Pay",
+        "description": "Ambil riwayat transaksi Binance Pay (masuk + keluar). Mode cepat pakai 'hours' (max 168). Mode 'full' loop semua transaksi mundur sampai 'days' (max 365) dengan dedupe otomatis.",
+        "tags": ["Debug"],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "hours": { "type": "number", "example": 24, "description": "Jam ke belakang (mode cepat, max 168)" },
+                  "full": { "type": "boolean", "example": false, "description": "Aktifkan mode full (loop semua)" },
+                  "days": { "type": "number", "example": 90, "description": "Hari ke belakang untuk mode full (max 365)" }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": { "description": "Daftar transaksi Pay" },
+          "400": { "description": "Credentials belum diisi" },
+          "502": { "description": "Error dari Binance" }
+        }
+      }
+    },
+    "/debug/deposit-history": {
+      "post": {
+        "summary": "Riwayat deposit on-chain",
+        "description": "Ambil riwayat deposit crypto masuk (on-chain) ke akun Binance.",
+        "tags": ["Debug"],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "hours": { "type": "number", "example": 24, "description": "Jam ke belakang (max 168)" },
+                  "coin": { "type": "string", "example": "USDT", "description": "Filter per coin (opsional)" }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": { "description": "Daftar deposit" },
+          "400": { "description": "Credentials belum diisi" },
+          "502": { "description": "Error dari Binance" }
+        }
+      }
+    },
+    "/debug/withdraw-history": {
+      "post": {
+        "summary": "Riwayat withdraw on-chain",
+        "description": "Ambil riwayat penarikan crypto keluar (on-chain) dari akun Binance.",
+        "tags": ["Debug"],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "hours": { "type": "number", "example": 24, "description": "Jam ke belakang (max 168)" },
+                  "coin": { "type": "string", "example": "USDT", "description": "Filter per coin (opsional)" }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": { "description": "Daftar withdraw" },
+          "400": { "description": "Credentials belum diisi" },
+          "502": { "description": "Error dari Binance" }
+        }
+      }
+    },
+    "/debug/balances": {
+      "post": {
+        "summary": "Saldo spot",
+        "description": "Ambil saldo semua aset spot yang lebih dari 0 (snapshot saat ini).",
+        "tags": ["Debug"],
+        "requestBody": {
+          "content": { "application/json": { "schema": { "type": "object" } } }
+        },
+        "responses": {
+          "200": { "description": "Daftar saldo aset" },
+          "400": { "description": "Credentials belum diisi" },
+          "502": { "description": "Error dari Binance" }
+        }
+      }
+    },
+    "/debug/overview": {
+      "post": {
+        "summary": "Overview akun lengkap",
+        "description": "Ambil semua isi akun sekaligus: saldo + timeline gabungan (Pay, deposit, withdraw, convert, dividen) diurut dari terbaru. Semua sumber ditarik paralel; sumber yang gagal tidak menggagalkan yang lain.",
+        "tags": ["Debug"],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "days": { "type": "number", "example": 30, "description": "Hari ke belakang (max 90)" }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": { "description": "Saldo + timeline aktivitas + status tiap sumber" },
+          "400": { "description": "Credentials belum diisi" }
+        }
+      }
     }
   }
 }
