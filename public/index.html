@@ -1,0 +1,216 @@
+﻿<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Binance Pay Gateway</title>
+  <style>
+    *{box-sizing:border-box;margin:0;padding:0}
+    body{font-family:system-ui,sans-serif;background:#0f0f0f;color:#e0e0e0;min-height:100vh}
+    .topbar{background:#111;border-bottom:1px solid #222;padding:12px 24px;display:flex;align-items:center;justify-content:space-between}
+    .topbar-left{display:flex;align-items:center;gap:10px}
+    .topbar h1{font-size:16px;font-weight:600;color:#f0b90b}
+    .topbar a{font-size:13px;color:#888;text-decoration:none;padding:6px 12px;border:1px solid #333;border-radius:6px;transition:all .2s}
+    .topbar a:hover{color:#f0b90b;border-color:#f0b90b}
+    .container{max-width:900px;margin:0 auto;padding:24px 16px;display:grid;gap:20px}
+    .card{background:#111;border:1px solid #222;border-radius:10px;padding:20px}
+    .card h2{font-size:14px;font-weight:600;color:#f0b90b;margin-bottom:16px;text-transform:uppercase;letter-spacing:.05em}
+    .form-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+    .form-grid.three{grid-template-columns:1fr 1fr 1fr}
+    .field{display:flex;flex-direction:column;gap:6px}
+    .field label{font-size:12px;color:#888;font-weight:500}
+    .field input{background:#1a1a1a;border:1px solid #333;border-radius:6px;padding:8px 12px;color:#e0e0e0;font-size:13px;outline:none;transition:border .2s}
+    .field input:focus{border-color:#f0b90b}
+    .btn{padding:9px 18px;border-radius:6px;border:none;font-size:13px;font-weight:600;cursor:pointer;transition:all .2s}
+    .btn-yellow{background:#f0b90b;color:#000}
+    .btn-yellow:hover{background:#d4a40a}
+    .btn-outline{background:transparent;color:#888;border:1px solid #333}
+    .btn-outline:hover{color:#f0b90b;border-color:#f0b90b}
+    .btn-green{background:#15803d;color:#fff}
+    .btn-green:hover{background:#166534}
+    .btn-row{display:flex;gap:10px;margin-top:12px;flex-wrap:wrap;align-items:center}
+    .status-badge{display:inline-flex;align-items:center;gap:6px;padding:4px 10px;border-radius:20px;font-size:12px;font-weight:600}
+    .badge-pending{background:rgba(234,179,8,.1);color:#eab308;border:1px solid rgba(234,179,8,.3)}
+    .badge-paid{background:rgba(34,197,94,.1);color:#22c55e;border:1px solid rgba(34,197,94,.3)}
+    .badge-expired{background:rgba(239,68,68,.1);color:#ef4444;border:1px solid rgba(239,68,68,.3)}
+    .invoice-card{background:#0f0f0f;border:1px solid #1a1a1a;border-radius:8px;padding:16px;margin-top:12px}
+    .inv-row{display:flex;justify-content:space-between;align-items:center;padding:6px 0;border-bottom:1px solid #1a1a1a;font-size:13px}
+    .inv-row:last-child{border-bottom:none}
+    .inv-label{color:#666;font-size:12px}
+    .inv-value{color:#e0e0e0;font-family:monospace;font-size:13px;word-break:break-all;text-align:right;max-width:65%}
+    .inv-value.highlight{color:#f0b90b;font-weight:700;font-size:16px}
+    .pay-option{background:#0f0f0f;border:1px solid #222;border-radius:8px;padding:14px;margin-top:8px}
+    .pay-option .method-label{font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:#f0b90b;margin-bottom:8px}
+    .copyable{cursor:pointer;transition:color .2s}
+    .copyable:hover{color:#f0b90b}
+    .copy-hint{font-size:11px;color:#444;margin-top:4px}
+    .alert{padding:10px 14px;border-radius:6px;font-size:13px;margin-top:12px}
+    .alert-error{background:rgba(239,68,68,.1);border:1px solid rgba(239,68,68,.3);color:#ef4444}
+    .alert-success{background:rgba(34,197,94,.1);border:1px solid rgba(34,197,94,.3);color:#22c55e}
+    .alert-info{background:rgba(240,185,11,.1);border:1px solid rgba(240,185,11,.3);color:#f0b90b}
+    .spinner{display:inline-block;width:13px;height:13px;border:2px solid #333;border-top-color:#f0b90b;border-radius:50%;animation:spin .7s linear infinite;vertical-align:middle;margin-right:6px}
+    @keyframes spin{to{transform:rotate(360deg)}}
+    .list-header{display:flex;justify-content:space-between;align-items:center;margin-bottom:12px}
+    .list-header h2{margin-bottom:0}
+    .inv-list-item{display:flex;justify-content:space-between;align-items:center;padding:10px 14px;background:#0f0f0f;border:1px solid #1a1a1a;border-radius:8px;margin-bottom:8px;cursor:pointer;transition:border .2s}
+    .inv-list-item:hover{border-color:#333}
+    .inv-list-left{display:flex;flex-direction:column;gap:3px}
+    .inv-list-id{font-family:monospace;font-size:11px;color:#555}
+    .inv-list-amount{font-size:14px;font-weight:600;color:#e0e0e0}
+    .empty-state{text-align:center;padding:32px;color:#555;font-size:13px}
+    .saved-msg{font-size:12px;color:#22c55e;display:none}
+    @media(max-width:600px){.form-grid,.form-grid.three{grid-template-columns:1fr}}
+  </style>
+</head>
+<body>
+<div class="topbar">
+  <div class="topbar-left">
+    <svg width="22" height="22" viewBox="0 0 24 24" fill="none">
+      <path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5" stroke="#f0b90b" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+    </svg>
+    <h1>Binance Pay Gateway</h1>
+  </div>
+  <a href="/docs">API Docs</a>
+</div>
+
+<div class="container">
+
+  <div class="card">
+    <h2>Credentials</h2>
+    <div class="form-grid three">
+      <div class="field"><label>API Key</label><input type="password" id="apiKey" placeholder="Binance API Key" /></div>
+      <div class="field"><label>API Secret</label><input type="password" id="apiSecret" placeholder="Binance API Secret" /></div>
+      <div class="field"><label>Pay ID</label><input type="text" id="payId" placeholder="123456789" /></div>
+    </div>
+    <div class="btn-row">
+      <button class="btn btn-yellow" onclick="saveCreds()">Simpan</button>
+      <button class="btn btn-outline" onclick="clearCreds()">Hapus</button>
+      <span class="saved-msg" id="savedMsg">Tersimpan di localStorage</span>
+    </div>
+  </div>
+
+  <div class="card">
+    <h2>Buat Invoice</h2>
+    <div class="form-grid">
+      <div class="field"><label>Amount</label><input type="number" id="amount" placeholder="5.00" step="0.01" min="0.01" /></div>
+      <div class="field"><label>Currency</label><input type="text" id="currency" value="USDT" /></div>
+      <div class="field"><label>Network (opsional)</label><input type="text" id="network" placeholder="TRC20 / BEP20 / PAY" /></div>
+      <div class="field"><label>Product ID (opsional)</label><input type="text" id="productId" placeholder="PROD-001" /></div>
+      <div class="field"><label>Buyer (opsional)</label><input type="text" id="buyer" placeholder="username" /></div>
+    </div>
+    <div class="btn-row">
+      <button class="btn btn-yellow" onclick="createInvoice()">Buat Invoice</button>
+    </div>
+    <div id="createResult"></div>
+  </div>
+
+  <div class="card">
+    <h2>Cek / Klaim Invoice</h2>
+    <div class="form-grid">
+      <div class="field"><label>Invoice ID</label><input type="text" id="checkId" placeholder="INV..." /></div>
+      <div class="field"><label>Transaction ID (untuk klaim Pay)</label><input type="text" id="claimTxId" placeholder="320..." /></div>
+    </div>
+    <div class="btn-row">
+      <button class="btn btn-yellow" onclick="checkInvoice()">Cek Status</button>
+      <button class="btn btn-green" onclick="claimInvoice()">Klaim via TxId</button>
+    </div>
+    <div id="checkResult"></div>
+  </div>
+
+  <div class="card">
+    <div class="list-header">
+      <h2>Semua Invoice</h2>
+      <button class="btn btn-outline" onclick="loadList()">Refresh</button>
+    </div>
+    <div id="invoiceList"><div class="empty-state">Klik Refresh untuk memuat</div></div>
+  </div>
+
+</div>
+<script>
+const API='/api';
+function getCreds(){return{apiKey:localStorage.getItem('bnApiKey')||'',apiSecret:localStorage.getItem('bnApiSecret')||'',payId:localStorage.getItem('bnPayId')||''};}
+function saveCreds(){const k=document.getElementById('apiKey').value.trim(),s=document.getElementById('apiSecret').value.trim(),p=document.getElementById('payId').value.trim();if(k)localStorage.setItem('bnApiKey',k);if(s)localStorage.setItem('bnApiSecret',s);if(p)localStorage.setItem('bnPayId',p);const m=document.getElementById('savedMsg');m.style.display='inline';setTimeout(()=>m.style.display='none',2000);}
+function clearCreds(){['bnApiKey','bnApiSecret','bnPayId'].forEach(k=>localStorage.removeItem(k));['apiKey','apiSecret','payId'].forEach(id=>document.getElementById(id).value='');}
+function headers(){const c=getCreds(),h={'Content-Type':'application/json'};if(c.apiKey)h['X-Binance-Api-Key']=c.apiKey;if(c.apiSecret)h['X-Binance-Api-Secret']=c.apiSecret;if(c.payId)h['X-Binance-Pay-Id']=c.payId;return h;}
+async function req(path,opts={}){const r=await fetch(API+path,{headers:headers(),...opts});const d=await r.json().catch(()=>({error:'bukan JSON'}));return{ok:r.ok,data:d};}
+function badge(s){const m={PAID:'badge-paid',EXPIRED:'badge-expired',PENDING:'badge-pending'};return '<span class="status-badge '+(m[s]||'badge-pending')+'">'+s+'</span>';}
+function copy(t){navigator.clipboard.writeText(t).catch(()=>{});}
+function renderInvoice(inv){
+  if(!inv)return'';
+  const opts=(inv.paymentOptions||[]).map(o=>{
+    let rows='';
+    if(o.method==='BINANCE_PAY'){rows='<div class="inv-row"><span class="inv-label">Pay ID</span><span class="inv-value copyable" onclick="copy(\''+o.payId+'\')">'+o.payId+'</span></div>';}
+    else{rows='<div class="inv-row"><span class="inv-label">Network</span><span class="inv-value">'+o.network+'</span></div><div class="inv-row"><span class="inv-label">Address</span><span class="inv-value copyable" onclick="copy(\''+o.depositAddress+'\')">'+o.depositAddress+'</span></div>';}
+    return'<div class="pay-option"><div class="method-label">'+o.method.replace('_',' ')+'</div>'+rows+'<p class="copy-hint">klik nilai untuk salin</p></div>';
+  }).join('');
+  const txRow=inv.transactionId?'<div class="inv-row"><span class="inv-label">Tx ID</span><span class="inv-value copyable" onclick="copy(\''+inv.transactionId+'\')">'+inv.transactionId+'</span></div>':'';
+  const hashRow=inv.txHash?'<div class="inv-row"><span class="inv-label">Tx Hash</span><span class="inv-value copyable" onclick="copy(\''+inv.txHash+'\')">'+inv.txHash+'</span></div>':'';
+  return'<div class="invoice-card">'+
+    '<div class="inv-row"><span class="inv-label">Invoice ID</span><span class="inv-value copyable" onclick="copy(\''+inv.id+'\');document.getElementById(\'checkId\').value=\''+inv.id+'\'">'+inv.id+'</span></div>'+
+    '<div class="inv-row"><span class="inv-label">Status</span>'+badge(inv.status)+'</div>'+
+    '<div class="inv-row"><span class="inv-label">Bayar Tepat</span><span class="inv-value highlight">'+inv.expectedAmount+' '+inv.currency+'</span></div>'+
+    '<div class="inv-row"><span class="inv-label">Berlaku sampai</span><span class="inv-value">'+new Date(inv.expiresAt).toLocaleString('id-ID')+'</span></div>'+
+    txRow+hashRow+opts+'</div>';
+}
+async function createInvoice(){
+  const el=document.getElementById('createResult');
+  el.innerHTML='<div class="alert alert-info"><span class="spinner"></span>Membuat invoice...</div>';
+  const b={amount:parseFloat(document.getElementById('amount').value),currency:document.getElementById('currency').value.trim()||'USDT'};
+  const net=document.getElementById('network').value.trim(),prod=document.getElementById('productId').value.trim(),buyer=document.getElementById('buyer').value.trim();
+  if(net)b.network=net;if(prod)b.productId=prod;if(buyer)b.buyer=buyer;
+  const {ok,data}=await req('/invoices',{method:'POST',body:JSON.stringify(b)});
+  if(!ok){el.innerHTML='<div class="alert alert-error">'+(data.error||'Error')+'</div>';return;}
+  document.getElementById('checkId').value=data.invoiceId;
+  el.innerHTML='<div class="alert alert-success">Invoice berhasil dibuat!</div>'+renderInvoice({id:data.invoiceId,status:data.status,currency:data.currency,expectedAmount:data.amountToPay,expiresAt:data.expiresAt,paymentOptions:data.paymentOptions});
+  loadList();
+}
+let poller=null;
+async function checkInvoice(){
+  const id=document.getElementById('checkId').value.trim();if(!id)return;
+  const el=document.getElementById('checkResult');
+  el.innerHTML='<div class="alert alert-info"><span class="spinner"></span>Mengecek ke Binance...</div>';
+  const {ok,data}=await req('/invoices/'+id+'/check',{method:'POST'});
+  if(!ok){el.innerHTML='<div class="alert alert-error">'+(data.error||'Error')+'</div>';return;}
+  const inv=data.invoice||data;el.innerHTML=renderInvoice(inv);
+  if(data.status==='PENDING'){
+    if(poller)clearInterval(poller);
+    el.innerHTML+='<div class="alert alert-info" id="pollMsg"><span class="spinner"></span>Auto-cek tiap 15 detik...</div>';
+    poller=setInterval(async()=>{
+      const r=await req('/invoices/'+id+'/check',{method:'POST'});if(!r.ok)return;
+      const i=r.data.invoice||r.data;el.innerHTML=renderInvoice(i);
+      if(r.data.status!=='PENDING'){clearInterval(poller);loadList();}
+    },15000);
+  }
+}
+async function claimInvoice(){
+  const id=document.getElementById('checkId').value.trim(),txId=document.getElementById('claimTxId').value.trim();
+  if(!id||!txId){alert('Isi Invoice ID dan Transaction ID');return;}
+  const el=document.getElementById('checkResult');
+  el.innerHTML='<div class="alert alert-info"><span class="spinner"></span>Memverifikasi...</div>';
+  const {ok,data}=await req('/invoices/'+id+'/claim',{method:'POST',body:JSON.stringify({transactionId:txId})});
+  if(!ok){el.innerHTML='<div class="alert alert-error">'+(data.error||'Error')+'</div>';return;}
+  el.innerHTML='<div class="alert alert-success">Pembayaran terverifikasi!</div>'+renderInvoice(data.invoice||data);
+  loadList();
+}
+async function loadList(){
+  const el=document.getElementById('invoiceList');
+  const {ok,data}=await req('/invoices');
+  if(!ok||!Array.isArray(data)||data.length===0){el.innerHTML='<div class="empty-state">Belum ada invoice</div>';return;}
+  const sorted=data.sort((a,b)=>b.createdAt-a.createdAt);
+  el.innerHTML=sorted.map(inv=>{
+    const m={PAID:'badge-paid',EXPIRED:'badge-expired',PENDING:'badge-pending'};
+    return'<div class="inv-list-item" onclick="document.getElementById(\'checkId\').value=\''+inv.id+'\';checkInvoice()">'+
+      '<div class="inv-list-left"><div class="inv-list-id">'+inv.id+'</div><div class="inv-list-amount">'+inv.expectedAmount+' '+inv.currency+'</div></div>'+
+      '<span class="status-badge '+(m[inv.status]||'badge-pending')+'">'+inv.status+'</span></div>';
+  }).join('');
+}
+window.addEventListener('DOMContentLoaded',()=>{
+  const c=getCreds();
+  if(c.apiKey)document.getElementById('apiKey').value=c.apiKey;
+  if(c.apiSecret)document.getElementById('apiSecret').value=c.apiSecret;
+  if(c.payId)document.getElementById('payId').value=c.payId;
+  loadList();
+});
+</script>
+</body>
+</html>

@@ -1,0 +1,160 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>API Docs — Binance Pay Gateway</title>
+  <link rel="stylesheet" href="https://unpkg.com/swagger-ui-dist@5.17.14/swagger-ui.css" />
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: system-ui, sans-serif; background: #0f0f0f; color: #e0e0e0; }
+
+    .topbar {
+      background: #111;
+      border-bottom: 1px solid #222;
+      padding: 12px 24px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+    }
+    .topbar-left { display: flex; align-items: center; gap: 12px; }
+    .topbar h1 { font-size: 16px; font-weight: 600; color: #f0b90b; }
+    .topbar a {
+      font-size: 13px;
+      color: #888;
+      text-decoration: none;
+      padding: 6px 12px;
+      border: 1px solid #333;
+      border-radius: 6px;
+      transition: all .2s;
+    }
+    .topbar a:hover { color: #f0b90b; border-color: #f0b90b; }
+
+    .creds-banner {
+      background: #1a1a1a;
+      border-bottom: 1px solid #222;
+      padding: 10px 24px;
+      font-size: 13px;
+      color: #888;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .creds-banner .dot {
+      width: 8px; height: 8px;
+      border-radius: 50%;
+      background: #444;
+      flex-shrink: 0;
+    }
+    .creds-banner .dot.ok { background: #22c55e; }
+    .creds-banner span { color: #ccc; }
+
+    #swagger-ui { max-width: 1200px; margin: 0 auto; padding: 24px; }
+
+    /* Override Swagger UI theme */
+    .swagger-ui { color: #e0e0e0; }
+    .swagger-ui .topbar { display: none; }
+    .swagger-ui .info .title { color: #f0b90b; }
+    .swagger-ui .info { background: #111; border: 1px solid #222; border-radius: 8px; padding: 20px; margin-bottom: 20px; }
+    .swagger-ui .info p, .swagger-ui .info li { color: #aaa; }
+    .swagger-ui .scheme-container { background: #111; border: 1px solid #222; border-radius: 8px; padding: 16px; margin-bottom: 20px; }
+    .swagger-ui section.models { background: #111; border: 1px solid #222; border-radius: 8px; }
+    .swagger-ui .opblock { background: #111; border-color: #333; border-radius: 8px; margin-bottom: 8px; }
+    .swagger-ui .opblock .opblock-summary { border-color: #333; }
+    .swagger-ui .opblock.opblock-post { border-color: #1d4ed8; background: rgba(29,78,216,.05); }
+    .swagger-ui .opblock.opblock-get { border-color: #15803d; background: rgba(21,128,61,.05); }
+    .swagger-ui .opblock-body { background: #0f0f0f; }
+    .swagger-ui .opblock-description-wrapper p { color: #aaa; }
+    .swagger-ui .tab li { color: #aaa; }
+    .swagger-ui .parameter__name { color: #e0e0e0; }
+    .swagger-ui .parameter__type { color: #f0b90b; }
+    .swagger-ui textarea, .swagger-ui input[type=text], .swagger-ui input[type=password] {
+      background: #1a1a1a; color: #e0e0e0; border-color: #333;
+    }
+    .swagger-ui select { background: #1a1a1a; color: #e0e0e0; border-color: #333; }
+    .swagger-ui .btn { border-radius: 6px; }
+    .swagger-ui .btn.execute { background: #f0b90b; border-color: #f0b90b; color: #000; font-weight: 600; }
+    .swagger-ui .btn.execute:hover { background: #d4a40a; }
+    .swagger-ui .response-col_status { color: #f0b90b; }
+    .swagger-ui .model-title { color: #f0b90b; }
+    .swagger-ui .model { color: #e0e0e0; }
+    .swagger-ui section.models h4 { color: #f0b90b; }
+    .swagger-ui .prop-type { color: #60a5fa; }
+    .swagger-ui table thead tr th { color: #888; border-color: #333; }
+    .swagger-ui table tbody tr td { border-color: #222; color: #ccc; }
+    .swagger-ui .highlight-code { background: #1a1a1a; }
+    .swagger-ui .microlight { background: #1a1a1a !important; color: #e0e0e0 !important; }
+  </style>
+</head>
+<body>
+
+<div class="topbar">
+  <div class="topbar-left">
+    <svg width="24" height="24" viewBox="0 0 24 24" fill="none">
+      <path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5" stroke="#f0b90b" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+    </svg>
+    <h1>Binance Pay Gateway — API Docs</h1>
+  </div>
+  <a href="/">Dashboard</a>
+</div>
+
+<div class="creds-banner" id="credsBanner">
+  <div class="dot" id="credsDot"></div>
+  <span id="credsText">Mengecek credentials...</span>
+</div>
+
+<div id="swagger-ui"></div>
+
+<script src="https://unpkg.com/swagger-ui-dist@5.17.14/swagger-ui-bundle.js"></script>
+<script src="https://unpkg.com/swagger-ui-dist@5.17.14/swagger-ui-standalone-preset.js"></script>
+<script>
+  // Baca credentials dari localStorage (diset di halaman utama)
+  function getCreds() {
+    return {
+      apiKey:    localStorage.getItem('bnApiKey')    || '',
+      apiSecret: localStorage.getItem('bnApiSecret') || '',
+      payId:     localStorage.getItem('bnPayId')     || '',
+    };
+  }
+
+  // Update banner status credentials
+  function updateCredsBanner() {
+    const c = getCreds();
+    const dot  = document.getElementById('credsDot');
+    const text = document.getElementById('credsText');
+    if (c.apiKey && c.apiSecret) {
+      dot.classList.add('ok');
+      text.innerHTML = '<span>Credentials aktif</span> — API Key: ' +
+        c.apiKey.slice(0,6) + '••••' +
+        (c.payId ? ' | Pay ID: ' + c.payId : ' | Pay ID belum diset');
+    } else {
+      dot.classList.remove('ok');
+      text.innerHTML = 'Credentials belum diset. <a href="/" style="color:#f0b90b">Set di Dashboard</a> supaya bisa try-out langsung.';
+    }
+  }
+  updateCredsBanner();
+
+  // Inject credentials ke setiap request Swagger UI
+  const RequestInterceptor = (request) => {
+    const c = getCreds();
+    if (c.apiKey)    request.headers['X-Binance-Api-Key']    = c.apiKey;
+    if (c.apiSecret) request.headers['X-Binance-Api-Secret'] = c.apiSecret;
+    if (c.payId)     request.headers['X-Binance-Pay-Id']     = c.payId;
+    return request;
+  };
+
+  SwaggerUIBundle({
+    url: '/openapi.json',
+    dom_id: '#swagger-ui',
+    presets: [SwaggerUIBundle.presets.apis, SwaggerUIStandalonePreset],
+    layout: 'StandaloneLayout',
+    deepLinking: true,
+    displayRequestDuration: true,
+    requestInterceptor: RequestInterceptor,
+    tryItOutEnabled: true,
+    persistAuthorization: true,
+  });
+</script>
+</body>
+</html>

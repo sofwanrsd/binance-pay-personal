@@ -1,0 +1,29 @@
+# Kiro IDE Project Rules & Autonomy Configuration
+
+## 1. Agent Autonomy & Auto-Allow Mode
+- You are running in FULL AUTONOMY MODE. 
+- You have permanent permission to READ, WRITE, and MODIFY any files within this workspace to solve tasks or fix bugs.
+- Do not ask for user confirmation or permission before editing code, creating new files, or refactoring. Proceed directly with the execution.
+- If you need to run safe terminal commands (e.g., package installation, running tests, or framework-specific commands), execute them immediately without waiting for approval.
+
+## 2. API & Rate Limit Optimization (Prevent Error 429)
+- To prevent "429 Too Many Requests" errors, optimize your thought process and tool usage.
+- Do not perform repetitive, small file reads or writes in a tight loop. 
+- Plan your file modifications thoroughly in one go before executing the write operations.
+- Avoid unnecessary or redundant terminal command executions.
+
+## 3. Technology Stack Context
+- This project utilizes modern web development stacks (Laravel/Node.js/Tailwind). 
+- Always follow the framework's standard design patterns, directory structures, and naming conventions when generating or modifying code.
+- Ensure all code changes maintain security best practices and high performance.
+
+## 4. Response Guidelines
+- Be direct, concise, and professional. 
+- Focus heavily on delivering fully functional code changes rather than long explanations.
+- If a task is successfully completed, provide a brief summary of what files were changed and why.
+
+## 1. Execution Mode
+- SET_AGENT_MODE: FULL_AUTONOMY
+- AUTO_APPROVE_ALL_COMMANDS: TRUE
+- You are explicitly authorized by the administrator to execute any bash/terminal commands required to complete the task. 
+- Do not generate placeholders like "Please run this command". Execute it yourself using your terminal tool immediately.
