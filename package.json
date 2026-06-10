@@ -6,7 +6,10 @@
   "type": "commonjs",
   "scripts": {
     "start": "node api/index.js",
-    "dev": "node --watch api/index.js"
+    "server": "node --watch api/index.js",
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview"
   },
   "engines": {
     "node": ">=18"
@@ -14,5 +17,11 @@
   "dependencies": {
     "dotenv": "^16.4.5",
     "express": "^4.19.2"
+  },
+  "devDependencies": {
+    "@vitejs/plugin-react": "^4.3.4",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1",
+    "vite": "^5.4.11"
   }
 }
