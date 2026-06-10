@@ -96,6 +96,22 @@ a{color:inherit}
 .creds-pill.ok{color:#cdd2dd}
 .creds-pill.ok .dot{background:#22c55e;box-shadow:0 0 10px #22c55e}
 
+/* Monitor Akun */
+.amt-in{color:#4ade80;font-weight:700}
+.amt-out{color:#f87171;font-weight:700}
+.type-pill{display:inline-block;font-size:10px;font-weight:700;letter-spacing:.05em;padding:3px 8px;border-radius:6px;text-transform:uppercase;color:#0a0c14}
+.row-time{font-size:11px;color:var(--muted2);margin-top:3px}
+.mon-row{display:flex;justify-content:space-between;align-items:center;gap:12px;padding:11px 0;border-bottom:1px solid var(--border)}
+.mon-row:last-child{border-bottom:none}
+.mon-left{display:flex;flex-direction:column;gap:2px;min-width:0}
+.mon-asset{font-size:13px;font-weight:600;color:var(--txt)}
+.mon-right{text-align:right;font-family:'JetBrains Mono',ui-monospace,monospace;font-size:13px;white-space:nowrap}
+.summary-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(120px,1fr));gap:10px;margin-bottom:14px}
+.summary-tile{background:linear-gradient(180deg,#11151f,#0d111b);border:1px solid var(--border2);border-radius:11px;padding:13px 15px}
+.summary-tile .st-label{font-size:10.5px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.05em;margin-bottom:6px}
+.summary-tile .st-value{font-size:18px;font-weight:800;letter-spacing:-.01em}
+.mon-section-title{font-size:11px;font-weight:700;letter-spacing:.08em;color:var(--accent);text-transform:uppercase;margin:18px 0 8px}
+
 .card.endpoint{padding:0;overflow:hidden}
 .ep-head{display:flex;align-items:center;gap:12px;padding:16px 20px;cursor:pointer;transition:background .15s}
 .ep-head:hover{background:rgba(139,124,255,.04)}

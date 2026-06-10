@@ -123,12 +123,18 @@ function DebugResult({ c }) {
           {c.truncated && <span style={{ color: '#eab308' }}> (terpotong, ada lebih banyak)</span>}
         </div>
         <Rows items={c.transactions} empty={`Tidak ada transaksi Pay dalam ${span}`}
-          render={(t) => (
-            <div className="inv-row" key={t.transactionId}>
-              <span className="inv-label">{fmtTime(t.transactionTime)}</span>
-              <span className="inv-value">{Number(t.amount) > 0 ? '+' : ''}{t.amount} {t.currency}</span>
-            </div>
-          )} />
+          render={(t) => {
+            const masuk = Number(t.amount) > 0;
+            return (
+              <div className="mon-row" key={t.transactionId}>
+                <div className="mon-left">
+                  <span className="type-pill" style={{ background: masuk ? '#22c55e' : '#ef4444' }}>{masuk ? 'MASUK' : 'KELUAR'}</span>
+                  <span className="row-time">{fmtTime(t.transactionTime)}</span>
+                </div>
+                <span className={`mon-right ${masuk ? 'amt-in' : 'amt-out'}`}>{masuk ? '+' : ''}{t.amount} {t.currency}</span>
+              </div>
+            );
+          }} />
       </>
     );
   }
@@ -138,9 +144,12 @@ function DebugResult({ c }) {
         <div className="alert alert-success">Koneksi OK — {c.count} deposit dalam {c.hoursBack} jam terakhir</div>
         <Rows items={c.deposits} empty={`Tidak ada deposit dalam ${c.hoursBack} jam terakhir`}
           render={(d) => (
-            <div className="inv-row" key={d.id}>
-              <span className="inv-label">{fmtTime(d.insertTime)} &nbsp; {d.network}</span>
-              <span className="inv-value">+{d.amount} {d.coin}</span>
+            <div className="mon-row" key={d.id}>
+              <div className="mon-left">
+                <span className="type-pill" style={{ background: '#22c55e' }}>DEPOSIT</span>
+                <span className="row-time">{fmtTime(d.insertTime)} &middot; {d.network}</span>
+              </div>
+              <span className="mon-right amt-in">+{d.amount} {d.coin}</span>
             </div>
           )} />
       </>
@@ -152,9 +161,12 @@ function DebugResult({ c }) {
         <div className="alert alert-success">Koneksi OK — {c.count} withdraw dalam {c.hoursBack} jam terakhir</div>
         <Rows items={c.withdrawals} empty={`Tidak ada withdraw dalam ${c.hoursBack} jam terakhir`}
           render={(w) => (
-            <div className="inv-row" key={w.id}>
-              <span className="inv-label">{w.applyTime} &nbsp; {w.network}</span>
-              <span className="inv-value">-{w.amount} {w.coin}</span>
+            <div className="mon-row" key={w.id}>
+              <div className="mon-left">
+                <span className="type-pill" style={{ background: '#ef4444' }}>WITHDRAW</span>
+                <span className="row-time">{w.applyTime} &middot; {w.network}</span>
+              </div>
+              <span className="mon-right amt-out">-{w.amount} {w.coin}</span>
             </div>
           )} />
       </>
@@ -166,9 +178,9 @@ function DebugResult({ c }) {
         <div className="alert alert-success">Koneksi OK — {c.count} aset ({c.accountType || ''})</div>
         <Rows items={c.balances} empty="Tidak ada saldo > 0"
           render={(b) => (
-            <div className="inv-row" key={b.asset}>
-              <span className="inv-label">{b.asset}</span>
-              <span className="inv-value">{b.free}{parseFloat(b.locked) > 0 ? ` (locked: ${b.locked})` : ''}</span>
+            <div className="mon-row" key={b.asset}>
+              <span className="mon-asset">{b.asset}</span>
+              <span className="mon-right">{b.free}{parseFloat(b.locked) > 0 ? <span style={{ color: 'var(--muted2)' }}> · locked {b.locked}</span> : ''}</span>
             </div>
           )} />
       </>
@@ -176,31 +188,46 @@ function DebugResult({ c }) {
   }
   if (c.kind === 'overview') {
     const failed = Object.entries(c.sources || {}).filter(([, v]) => !v).map(([k]) => k);
+    const counts = {};
+    for (const t of c.timeline) counts[t.type] = (counts[t.type] || 0) + 1;
     return (
       <>
         <div className="alert alert-success">
           Akun {c.accountType || ''} — {c.balances.length} aset, {c.timeline.length} aktivitas ({c.daysBack} hari)
         </div>
         {failed.length > 0 && <div className="alert alert-error">Gagal ambil: {failed.join(', ')}</div>}
-        <div className="method-label" style={{ margin: '12px 0 4px' }}>SALDO</div>
+
+        <div className="summary-grid">
+          {Object.entries(counts).map(([type, n]) => (
+            <div className="summary-tile" key={type}>
+              <div className="st-label">{type}</div>
+              <div className="st-value" style={{ color: TYPE_COLOR[type] || '#888' }}>{n}</div>
+            </div>
+          ))}
+        </div>
+
+        <div className="mon-section-title">Saldo</div>
         <Rows items={c.balances} empty="Tidak ada saldo"
           render={(b) => (
-            <div className="inv-row" key={b.asset}>
-              <span className="inv-label">{b.asset}</span>
-              <span className="inv-value">{b.free}{parseFloat(b.locked) > 0 ? ` (locked: ${b.locked})` : ''}</span>
+            <div className="mon-row" key={b.asset}>
+              <span className="mon-asset">{b.asset}</span>
+              <span className="mon-right">{b.free}{parseFloat(b.locked) > 0 ? <span style={{ color: 'var(--muted2)' }}> · locked {b.locked}</span> : ''}</span>
             </div>
           )} />
-        <div className="method-label" style={{ margin: '12px 0 4px' }}>TIMELINE AKTIVITAS</div>
+        <div className="mon-section-title">Timeline Aktivitas</div>
         <Rows items={c.timeline} empty={`Tidak ada aktivitas dalam ${c.daysBack} hari`}
-          render={(t, i) => (
-            <div className="inv-row" key={i}>
-              <span className="inv-label">
-                <span style={{ color: TYPE_COLOR[t.type] || '#888', fontWeight: 600 }}>{t.type}</span>
-                &nbsp; {fmtTime(t.time)}{t.network ? ` \u00b7 ${t.network}` : ''}
-              </span>
-              <span className="inv-value">{t.amount} {t.asset}</span>
-            </div>
-          )} />
+          render={(t, i) => {
+            const out = String(t.amount).trim().startsWith('-');
+            return (
+              <div className="mon-row" key={i}>
+                <div className="mon-left">
+                  <span className="type-pill" style={{ background: TYPE_COLOR[t.type] || '#888' }}>{t.type}</span>
+                  <span className="row-time">{fmtTime(t.time)}{t.network ? ` \u00b7 ${t.network}` : ''}</span>
+                </div>
+                <span className={`mon-right ${out ? 'amt-out' : 'amt-in'}`}>{t.amount} {t.asset}</span>
+              </div>
+            );
+          }} />
       </>
     );
   }
