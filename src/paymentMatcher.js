@@ -1,14 +1,14 @@
 'use strict';
 
-const config = require('./config');
-const store = require('./orderStore');
-
 /**
- * Logika inti: memutuskan apakah sebuah transaksi Binance Pay cocok dengan
- * sebuah invoice. SEMUA aturan keamanan ada di sini.
+ * Logika matching pembayaran — PURE & STATELESS.
  *
- * Sumber kebenaran = data transaksi dari API history akun sendiri, BUKAN
- * klaim/ screenshot buyer.
+ * Tidak menyimpan apa pun. Menerima kriteria (amount, currency, network,
+ * window waktu) lalu mencari transaksi/deposit yang cocok dari data history
+ * akun. Anti-replay (cegah satu transaksi dipakai 2x) adalah tanggung jawab
+ * sistem PEMANGGIL (web/bot), bukan server ini.
+ *
+ * Sumber kebenaran = data dari API history akun sendiri, bukan klaim buyer.
  */
 
 /** Normalisasi amount string Binance ("-0.0001") jadi number. */
@@ -22,197 +22,126 @@ function isIncome(tx) {
   return toAmount(tx.amount) > 0;
 }
 
+/** Cek nominal cocok dalam toleransi persen. */
+function amountMatches(actual, expected, tolerancePercent) {
+  const tolerance = (expected * tolerancePercent) / 100;
+  return Math.abs(actual - expected) <= tolerance;
+}
+
 /**
- * Cek apakah satu transaksi memenuhi syarat untuk sebuah invoice.
+ * Cek apakah satu transaksi Binance Pay cocok dengan kriteria.
+ * @param {object} tx - item dari getPayTransactions()
+ * @param {object} c  - kriteria
+ * @param {number} c.amount         nominal yang diharapkan
+ * @param {string} c.currency       mata uang (USDT, dll)
+ * @param {number} c.tolerancePercent toleransi selisih (%)
+ * @param {number} [c.startTime]    epoch ms — transaksi tidak boleh sebelum ini
+ * @param {number} [c.endTime]      epoch ms — transaksi tidak boleh sesudah ini
  * @returns {{ ok: boolean, reason?: string }}
  */
-async function verifyMatch(invoice, tx) {
-  if (!invoice || !tx) return { ok: false, reason: 'data kurang' };
+function matchPay(tx, c) {
+  if (!tx) return { ok: false, reason: 'data kurang' };
+  if (!String(tx.transactionId || '')) return { ok: false, reason: 'transaksi tanpa id' };
+  if (!isIncome(tx)) return { ok: false, reason: 'bukan transaksi masuk' };
 
-  const txId = String(tx.transactionId || '');
-  if (!txId) return { ok: false, reason: 'transaksi tanpa id' };
-
-  // 1) Anti-replay: transaksi sudah pernah dipakai invoice lain
-  if (await store.isTransactionUsed(txId)) {
-    return { ok: false, reason: 'transaksi sudah pernah dipakai' };
-  }
-
-  // 2) Harus transaksi MASUK (income), bukan kamu yang bayar
-  if (!isIncome(tx)) {
-    return { ok: false, reason: 'bukan transaksi masuk' };
-  }
-
-  // 3) Mata uang harus sama
-  if (String(tx.currency || '').toUpperCase() !== invoice.currency) {
+  if (String(tx.currency || '').toUpperCase() !== String(c.currency).toUpperCase()) {
     return { ok: false, reason: 'mata uang tidak cocok' };
   }
 
-  // 4) Nominal cocok dalam toleransi
-  const txAmount = Math.abs(toAmount(tx.amount));
-  const expected = invoice.expectedAmount;
-  const tolerance = (expected * config.amountTolerancePercent) / 100;
-  const diff = Math.abs(txAmount - expected);
-  if (diff > tolerance) {
-    if (txAmount < expected - tolerance) {
-      return { ok: false, reason: `kurang bayar (${txAmount} < ${expected})` };
-    }
-    return { ok: false, reason: `nominal tidak cocok (${txAmount} vs ${expected})` };
+  const amt = Math.abs(toAmount(tx.amount));
+  if (!amountMatches(amt, c.amount, c.tolerancePercent)) {
+    if (amt < c.amount) return { ok: false, reason: `kurang bayar (${amt} < ${c.amount})` };
+    return { ok: false, reason: `nominal tidak cocok (${amt} vs ${c.amount})` };
   }
 
-  // 5) Waktu transaksi dalam window invoice (+ grace period)
-  const txTime = Number(tx.transactionTime || 0);
-  const graceMs = config.matchGraceMinutes * 60 * 1000;
-  // Beri sedikit kelonggaran sebelum createdAt untuk selisih jam server
-  const startOk = txTime >= invoice.createdAt - 5 * 60 * 1000;
-  const endOk = txTime <= invoice.expiresAt + graceMs;
-  if (!startOk || !endOk) {
-    return { ok: false, reason: 'di luar window waktu invoice' };
-  }
+  const t = Number(tx.transactionTime || 0);
+  if (c.startTime && t < c.startTime) return { ok: false, reason: 'di luar window waktu' };
+  if (c.endTime && t > c.endTime) return { ok: false, reason: 'di luar window waktu' };
 
   return { ok: true };
 }
 
 /**
- * Tandai invoice sebagai PAID berdasarkan transaksi yang sudah terverifikasi.
- * Melakukan dedupe (markTransactionUsed) secara atomik-ish (single thread).
- * @returns {object|null} invoice terupdate, atau null kalau gagal/keduluan.
+ * Cek apakah satu deposit on-chain cocok dengan kriteria.
+ * @param {object} deposit - item dari getDepositHistory()
+ * @param {object} c - kriteria (sama spt matchPay) + c.network opsional
+ * @param {string} normalizedNetwork - hasil normalizeNetwork(deposit.network)
+ * @returns {{ ok: boolean, reason?: string }}
  */
-async function settleInvoice(invoice, tx) {
-  const txId = String(tx.transactionId);
+function matchDeposit(deposit, c, normalizedNetwork) {
+  if (!deposit) return { ok: false, reason: 'data kurang' };
+  if (!String(deposit.id || '')) return { ok: false, reason: 'deposit tanpa id' };
 
-  // Cek ulang tepat sebelum commit (hindari race di event loop)
-  if (await store.isTransactionUsed(txId)) return null;
-  const current = await store.get(invoice.id);
-  if (!current || current.status !== 'PENDING') return null;
+  if (String(deposit.coin || '').toUpperCase() !== String(c.currency).toUpperCase()) {
+    return { ok: false, reason: 'coin tidak cocok' };
+  }
 
-  await store.markTransactionUsed(txId);
-  return store.update(invoice.id, {
-    status: 'PAID',
-    transactionId: txId,
-    paidAmount: Math.abs(toAmount(tx.amount)),
-    paidAt: Date.now(),
-    transactionTime: Number(tx.transactionTime || 0),
-  });
+  if (c.network && String(c.network).toUpperCase() !== normalizedNetwork) {
+    return { ok: false, reason: 'network tidak cocok' };
+  }
+
+  const amt = Math.abs(toAmount(deposit.amount));
+  if (!amountMatches(amt, c.amount, c.tolerancePercent)) {
+    if (amt < c.amount) return { ok: false, reason: `kurang bayar (${amt} < ${c.amount})` };
+    return { ok: false, reason: `nominal tidak cocok (${amt} vs ${c.amount})` };
+  }
+
+  const t = Number(deposit.insertTime || 0);
+  if (c.startTime && t < c.startTime) return { ok: false, reason: 'di luar window waktu' };
+  if (c.endTime && t > c.endTime) return { ok: false, reason: 'di luar window waktu' };
+
+  return { ok: true };
 }
 
 /**
- * Cari invoice PENDING yang cocok untuk sebuah transaksi (dipakai poller).
- * @returns {Promise<object|null>} invoice yang cocok.
+ * Cari transaksi Pay pertama yang cocok dari daftar.
+ * @param {Array} txs
+ * @param {object} c kriteria
+ * @returns {object|null} transaksi yang cocok (sudah dinormalisasi)
  */
-async function findMatchingInvoice(tx) {
-  const candidates = await store.pending();
-  // Urutkan dari yang terbaru biar deterministik kalau ada beberapa cocok
-  candidates.sort((a, b) => b.createdAt - a.createdAt);
-  for (const inv of candidates) {
-    if ((await verifyMatch(inv, tx)).ok) return inv;
+function findPayMatch(txs, c) {
+  const sorted = [...txs].sort((a, b) => Number(b.transactionTime) - Number(a.transactionTime));
+  for (const tx of sorted) {
+    if (matchPay(tx, c).ok) {
+      return {
+        method: 'BINANCE_PAY',
+        transactionId: String(tx.transactionId),
+        amount: Math.abs(toAmount(tx.amount)),
+        currency: tx.currency,
+        transactionTime: Number(tx.transactionTime || 0),
+      };
+    }
   }
   return null;
 }
 
 /**
- * Verifikasi deposit on-chain cocok dengan invoice.
- * Struktur deposit item beda dari Pay transaction:
- *  - id          -> dipakai sebagai transactionId (dedupe)
- *  - amount      -> string, selalu positif
- *  - coin        -> "USDT" dll
- *  - network     -> "TRX"/"BSC" dll (perlu dinormalisasi ke TRC20/BEP20)
- *  - insertTime  -> epoch ms
- *  - status      -> 1 = success (sudah difilter di client)
- *
- * @param {object} invoice
- * @param {object} deposit - item dari getDepositHistory()
- * @param {string} normalizedNetwork - hasil normalizeNetwork(deposit.network)
- * @returns {{ ok: boolean, reason?: string }}
+ * Cari deposit on-chain pertama yang cocok dari daftar.
+ * @param {Array} deposits
+ * @param {object} c kriteria
+ * @param {function} normalizeNetwork
+ * @returns {object|null} deposit yang cocok (sudah dinormalisasi)
  */
-async function verifyDepositMatch(invoice, deposit, normalizedNetwork) {
-  if (!invoice || !deposit) return { ok: false, reason: 'data kurang' };
-
-  const txId = String(deposit.id || '');
-  if (!txId) return { ok: false, reason: 'deposit tanpa id' };
-
-  // 1) Anti-replay
-  if (await store.isTransactionUsed(txId)) {
-    return { ok: false, reason: 'deposit sudah pernah dipakai' };
-  }
-
-  // 2) Coin harus sama dengan currency invoice
-  if (String(deposit.coin || '').toUpperCase() !== invoice.currency) {
-    return { ok: false, reason: 'coin tidak cocok' };
-  }
-
-  // 3) Network harus masuk daftar acceptedNetworks invoice (kalau ada)
-  if (invoice.network && invoice.network !== normalizedNetwork) {
-    return { ok: false, reason: 'network tidak cocok dengan invoice' };
-  }
-
-  // 4) Nominal cocok dalam toleransi
-  const depositAmount = Math.abs(toAmount(deposit.amount));
-  const expected = invoice.expectedAmount;
-  const tolerance = (expected * config.amountTolerancePercent) / 100;
-  const diff = Math.abs(depositAmount - expected);
-  if (diff > tolerance) {
-    if (depositAmount < expected - tolerance) {
-      return { ok: false, reason: `kurang bayar (${depositAmount} < ${expected})` };
+function findDepositMatch(deposits, c, normalizeNetwork) {
+  const sorted = [...deposits].sort((a, b) => Number(b.insertTime) - Number(a.insertTime));
+  for (const d of sorted) {
+    const net = normalizeNetwork(d.network || '');
+    if (matchDeposit(d, c, net).ok) {
+      return {
+        method: 'ONCHAIN',
+        transactionId: String(d.id),
+        txHash: d.txId || '',
+        amount: Math.abs(toAmount(d.amount)),
+        currency: d.coin,
+        network: net,
+        transactionTime: Number(d.insertTime || 0),
+      };
     }
-    return { ok: false, reason: `nominal tidak cocok (${depositAmount} vs ${expected})` };
-  }
-
-  // 5) Waktu deposit dalam window invoice + grace
-  const depositTime = Number(deposit.insertTime || 0);
-  const graceMs = config.matchGraceMinutes * 60 * 1000;
-  const startOk = depositTime >= invoice.createdAt - 5 * 60 * 1000;
-  const endOk = depositTime <= invoice.expiresAt + graceMs;
-  if (!startOk || !endOk) {
-    return { ok: false, reason: 'di luar window waktu invoice' };
-  }
-
-  return { ok: true };
-}
-
-/**
- * Settle invoice dari deposit on-chain yang sudah terverifikasi.
- * @returns {object|null}
- */
-async function settleInvoiceFromDeposit(invoice, deposit, normalizedNetwork) {
-  const txId = String(deposit.id);
-
-  if (await store.isTransactionUsed(txId)) return null;
-  const current = await store.get(invoice.id);
-  if (!current || current.status !== 'PENDING') return null;
-
-  await store.markTransactionUsed(txId);
-  return store.update(invoice.id, {
-    status: 'PAID',
-    transactionId: txId,
-    txHash: deposit.txId || '',          // hash on-chain
-    paidAmount: Math.abs(toAmount(deposit.amount)),
-    paidAt: Date.now(),
-    transactionTime: Number(deposit.insertTime || 0),
-    payMethod: 'ONCHAIN',
-    network: normalizedNetwork,
-  });
-}
-
-/**
- * Cari invoice PENDING yang cocok untuk sebuah deposit (dipakai poller).
- * @returns {Promise<object|null>}
- */
-async function findMatchingInvoiceForDeposit(deposit, normalizedNetwork) {
-  const candidates = await store.pending();
-  candidates.sort((a, b) => b.createdAt - a.createdAt);
-  for (const inv of candidates) {
-    if ((await verifyDepositMatch(inv, deposit, normalizedNetwork)).ok) return inv;
   }
   return null;
 }
 
 module.exports = {
-  verifyMatch,
-  settleInvoice,
-  findMatchingInvoice,
-  verifyDepositMatch,
-  settleInvoiceFromDeposit,
-  findMatchingInvoiceForDeposit,
-  isIncome,
-  toAmount,
+  toAmount, isIncome, amountMatches,
+  matchPay, matchDeposit, findPayMatch, findDepositMatch,
 };

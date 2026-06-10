@@ -98,11 +98,11 @@
         }
       }
     },
-    "/invoices": {
+    "/payment-options": {
       "post": {
-        "summary": "Buat invoice baru",
-        "description": "Membuat invoice pembayaran baru. Response berisi opsi pembayaran (Pay ID dan/atau deposit address on-chain).",
-        "tags": ["Invoices"],
+        "summary": "Buat instruksi pembayaran",
+        "description": "Menghasilkan saran nominal unik + opsi pembayaran (Pay ID / deposit address). STATELESS — server tidak menyimpan apa pun. Sistem pemanggil yang menyimpan nominal untuk dicek nanti.",
+        "tags": ["Payment"],
         "requestBody": {
           "required": true,
           "content": {
@@ -111,33 +111,27 @@
                 "type": "object",
                 "required": ["amount"],
                 "properties": {
-                  "amount": { "type": "number", "example": 5.00, "description": "Nominal dalam satuan currency" },
-                  "currency": { "type": "string", "example": "USDT", "description": "Mata uang (default: USDT)" },
-                  "network": { "type": "string", "example": "TRC20", "description": "Batasi ke satu network. Kosongkan untuk semua. Gunakan PAY untuk Binance Pay only." },
-                  "productId": { "type": "string", "example": "PROD-001", "description": "ID produk (opsional)" },
-                  "buyer": { "type": "string", "example": "user123", "description": "Identifier buyer (opsional)" }
+                  "amount": { "type": "number", "example": 5.00, "description": "Nominal dasar" },
+                  "currency": { "type": "string", "example": "USDT", "description": "Mata uang (default USDT)" },
+                  "network": { "type": "string", "example": "TRC20", "description": "Batasi ke satu network. Kosongkan untuk semua. PAY = Binance Pay only." }
                 }
               }
             }
           }
         },
         "responses": {
-          "201": {
-            "description": "Invoice berhasil dibuat",
+          "200": {
+            "description": "Instruksi pembayaran",
             "content": {
               "application/json": {
                 "schema": {
                   "type": "object",
                   "properties": {
-                    "invoiceId": { "type": "string" },
-                    "status": { "type": "string" },
+                    "amountToPay": { "type": "number", "description": "Nominal unik yang harus dibayar buyer" },
                     "currency": { "type": "string" },
-                    "amountToPay": { "type": "number" },
-                    "expiresAt": { "type": "integer" },
-                    "paymentOptions": {
-                      "type": "array",
-                      "items": { "$ref": "#/components/schemas/PaymentOption" }
-                    }
+                    "network": { "type": "string", "nullable": true },
+                    "tolerancePercent": { "type": "number" },
+                    "paymentOptions": { "type": "array", "items": { "$ref": "#/components/schemas/PaymentOption" } }
                   }
                 }
               }
@@ -145,90 +139,60 @@
           },
           "400": { "description": "Input tidak valid", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Error" } } } }
         }
-      },
-      "get": {
-        "summary": "Daftar semua invoice",
-        "description": "Mengembalikan semua invoice yang tersimpan. Lindungi dengan autentikasi di produksi.",
-        "tags": ["Invoices"],
-        "responses": {
-          "200": {
-            "description": "List invoice",
-            "content": {
-              "application/json": {
-                "schema": { "type": "array", "items": { "$ref": "#/components/schemas/Invoice" } }
-              }
-            }
-          }
-        }
       }
     },
-    "/invoices/{invoiceId}": {
-      "get": {
-        "summary": "Cek status invoice",
-        "tags": ["Invoices"],
-        "parameters": [
-          { "name": "invoiceId", "in": "path", "required": true, "schema": { "type": "string" }, "example": "INV1A2B3C4DABCD" }
-        ],
-        "responses": {
-          "200": { "description": "Detail invoice", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Invoice" } } } },
-          "404": { "description": "Invoice tidak ditemukan", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Error" } } } }
-        }
-      }
-    },
-    "/invoices/{invoiceId}/check": {
+    "/check-payment": {
       "post": {
-        "summary": "Cek pembayaran on-demand",
-        "description": "Trigger pengecekan ke Binance API secara langsung. Cocok dipakai polling dari frontend tiap beberapa detik untuk update status invoice.",
-        "tags": ["Invoices"],
-        "parameters": [
-          { "name": "invoiceId", "in": "path", "required": true, "schema": { "type": "string" } }
-        ],
-        "responses": {
-          "200": {
-            "description": "Status terkini invoice",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object",
-                  "properties": {
-                    "status": { "type": "string", "enum": ["PENDING", "PAID", "EXPIRED"] },
-                    "invoice": { "$ref": "#/components/schemas/Invoice" }
-                  }
-                }
-              }
-            }
-          },
-          "404": { "description": "Invoice tidak ditemukan" }
-        }
-      }
-    },
-    "/invoices/{invoiceId}/claim": {
-      "post": {
-        "summary": "Klaim pembayaran via Transaction ID",
-        "description": "Verifikasi cepat dengan mengirim Transaction ID dari Binance Pay. Lebih cepat dari menunggu auto-check.",
-        "tags": ["Invoices"],
-        "parameters": [
-          { "name": "invoiceId", "in": "path", "required": true, "schema": { "type": "string" } }
-        ],
+        "summary": "Cek pembayaran masuk",
+        "description": "Cek apakah ADA pembayaran masuk yang cocok dengan kriteria (amount, currency, network, window waktu). STATELESS — tidak menyimpan apa pun. Anti-replay (cegah 1 transaksi dipakai 2x) adalah tanggung jawab sistem pemanggil.",
+        "tags": ["Payment"],
         "requestBody": {
           "required": true,
           "content": {
             "application/json": {
               "schema": {
                 "type": "object",
-                "required": ["transactionId"],
+                "required": ["amount"],
                 "properties": {
-                  "transactionId": { "type": "string", "example": "320123456789", "description": "Transaction ID dari riwayat Binance Pay" }
+                  "amount": { "type": "number", "example": 5.0037, "description": "Nominal yang dicocokkan (gunakan amountToPay dari /payment-options)" },
+                  "currency": { "type": "string", "example": "USDT" },
+                  "network": { "type": "string", "example": "TRC20", "description": "Batasi metode. PAY = Binance Pay only. Kosong = semua." },
+                  "sinceMinutes": { "type": "number", "example": 60, "description": "Window pencarian ke belakang (menit, max 10080 = 7 hari)" },
+                  "tolerancePercent": { "type": "number", "example": 0.5, "description": "Override toleransi selisih nominal" }
                 }
               }
             }
           }
         },
         "responses": {
-          "200": { "description": "Pembayaran terverifikasi", "content": { "application/json": { "schema": { "type": "object", "properties": { "status": { "type": "string" }, "invoice": { "$ref": "#/components/schemas/Invoice" } } } } } },
-          "404": { "description": "Transaksi tidak ditemukan" },
-          "422": { "description": "Verifikasi gagal (nominal tidak cocok, dll)" },
-          "429": { "description": "Terlalu banyak percobaan" }
+          "200": {
+            "description": "Hasil pengecekan",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "paid": { "type": "boolean", "description": "true kalau ada pembayaran cocok" },
+                    "match": {
+                      "type": "object",
+                      "nullable": true,
+                      "properties": {
+                        "method": { "type": "string", "enum": ["BINANCE_PAY", "ONCHAIN"] },
+                        "transactionId": { "type": "string" },
+                        "txHash": { "type": "string" },
+                        "amount": { "type": "number" },
+                        "currency": { "type": "string" },
+                        "network": { "type": "string" },
+                        "transactionTime": { "type": "integer" }
+                      }
+                    },
+                    "criteria": { "type": "object" }
+                  }
+                }
+              }
+            }
+          },
+          "400": { "description": "Credentials/input tidak valid", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Error" } } } }
         }
       }
     },

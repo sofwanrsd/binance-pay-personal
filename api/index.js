@@ -4,8 +4,8 @@ const express = require('express');
 const path = require('path');
 
 // Di Vercel (serverless), setiap request bisa dapat instance baru.
-// Poller background tidak bisa jalan — gunakan /api/invoices/:id/check
-// untuk trigger cek on-demand, atau buyer kirim TxId via /claim.
+// Server STATELESS — tidak menyimpan apa pun. Cek pembayaran on-demand
+// via /api/check-payment.
 
 const app = express();
 
@@ -35,27 +35,7 @@ module.exports = app;
 // Jalan juga sebagai server biasa untuk dev lokal & npm start
 if (require.main === module) {
   const config = require('../src/config');
-  const store = require('../src/orderStore');
-  const poller = require('../src/poller');
-
-  const server = app.listen(config.port, () => {
-    console.log(`Server jalan di http://localhost:${config.port}`);
-    if (config.apiKey && config.apiSecret) {
-      poller.start();
-    } else {
-      console.warn('[poller] tidak dimulai, isi .env dulu');
-    }
+  app.listen(config.port, () => {
+    console.log(`Server (stateless) jalan di http://localhost:${config.port}`);
   });
-
-  function shutdown(sig) {
-    console.log(`[${sig}] shutdown...`);
-    poller.stop();
-    server.close(() => {
-      store.flushSync();
-      process.exit(0);
-    });
-    setTimeout(() => { store.flushSync(); process.exit(0); }, 5000).unref();
-  }
-  process.on('SIGINT', () => shutdown('SIGINT'));
-  process.on('SIGTERM', () => shutdown('SIGTERM'));
 }

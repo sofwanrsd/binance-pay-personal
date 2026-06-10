@@ -11,16 +11,12 @@ Mendukung dua metode pembayaran:
 ```
 ui/          Frontend React + Vite (dashboard, tutorial, API docs)
 api/         Serverless entry point (Express, untuk Vercel + dev lokal)
-src/         Logic backend
+src/         Logic backend (STATELESS — tidak menyimpan apa pun)
   config.js            Baca credentials per-request dari header
   routes.js            Semua endpoint API
   binanceSpotClient.js Client Binance Spot API (signed requests)
-  paymentMatcher.js    Verifikasi & matching pembayaran (async)
-  orderStore.js        Storage: KV (Vercel) atau in-memory (lokal)
-  kvClient.js          Wrapper Upstash/Vercel KV
-  poller.js            Background poller (dev lokal only)
+  paymentMatcher.js    Pure functions matching pembayaran
   rateLimit.js         Rate limiter per IP
-  fulfillment.js       Hook setelah pembayaran berhasil
 test/        Unit test (node:test)
 ```
 
@@ -69,30 +65,20 @@ npm start        # jalankan backend Express
 
 **Penting:** untuk mode API provider publik, **jangan** isi env `BINANCE_API_KEY`/`BINANCE_API_SECRET` di Vercel — biarkan kosong supaya tiap pemanggil pakai akun sendiri.
 
-### Storage Persisten (opsional tapi disarankan)
+### Tanpa Database
 
-Filesystem Vercel ephemeral, jadi invoice tidak bertahan tanpa KV. Untuk invoice produktif, tambahkan Upstash Redis / Vercel KV lalu set env:
-
-```
-KV_REST_API_URL=https://xxx.upstash.io
-KV_REST_API_TOKEN=xxxxx
-```
-
-Tanpa env ini, sistem otomatis fallback ke in-memory (cukup untuk dev/checking, tidak persisten).
+Server **stateless** — tidak menyimpan invoice/order sama sekali, jadi **tidak butuh database**. Pencatatan order, anti-replay (cegah satu transaksi dipakai dua kali), dan logika bisnis adalah tanggung jawab sistem pemanggil (web/bot kamu).
 
 ## Endpoint API
 
 Base URL: `/api`
 
-### Invoice (Payment Gateway)
+### Payment (stateless)
 
 | Method | Path | Fungsi |
 |--------|------|--------|
-| POST | `/invoices` | Buat invoice baru |
-| GET | `/invoices` | Daftar semua invoice |
-| GET | `/invoices/:id` | Detail invoice |
-| POST | `/invoices/:id/check` | Cek pembayaran on-demand |
-| POST | `/invoices/:id/claim` | Klaim cepat via Transaction ID |
+| POST | `/payment-options` | Buat instruksi bayar + saran nominal unik |
+| POST | `/check-payment` | Cek apakah ada pembayaran masuk yang cocok |
 
 ### Debug / Checking Akun (stateless)
 
@@ -118,7 +104,7 @@ curl -X POST https://your-app.vercel.app/api/debug/overview \
   -d '{ "days": 7 }'
 ```
 
-### Alur invoice (JavaScript)
+### Alur pembayaran (JavaScript)
 
 ```js
 const headers = {
@@ -128,18 +114,25 @@ const headers = {
   'X-Binance-Pay-Id': PAY_ID,
 };
 
-// 1. Buat invoice
-const inv = await fetch(BASE + '/api/invoices', {
+// 1. Minta instruksi bayar + nominal unik (simpan di DB sistem kamu)
+const opt = await fetch(BASE + '/api/payment-options', {
   method: 'POST', headers,
   body: JSON.stringify({ amount: 5, currency: 'USDT' }),
 }).then((r) => r.json());
+// opt.amountToPay -> nominal unik yang harus dibayar buyer
 
-// 2. Poll status sampai PAID
-const status = await fetch(BASE + '/api/invoices/' + inv.invoiceId + '/check', {
+// 2. Cek apakah pembayaran sudah masuk (poll berkala)
+const check = await fetch(BASE + '/api/check-payment', {
   method: 'POST', headers,
+  body: JSON.stringify({
+    amount: opt.amountToPay,
+    currency: 'USDT',
+    sinceMinutes: 30,
+  }),
 }).then((r) => r.json());
 
-if (status.status === 'PAID') {
+if (check.paid) {
+  // check.match.transactionId -> simpan agar tidak dipakai ulang (anti-replay)
   // kirim barang / aktivasi
 }
 ```
@@ -151,10 +144,9 @@ Pembayaran diverifikasi dari **history akun sendiri** (bukan klaim buyer). Atura
 - Hanya transaksi **masuk** (income) yang dihitung
 - Nominal cocok dalam toleransi (default ±0.5%)
 - Mata uang / coin & network sesuai
-- Waktu dalam window invoice + grace period
-- Anti-replay: satu transaksi tidak bisa dipakai dua invoice
+- Waktu dalam window yang diminta (`sinceMinutes`)
 
-Tiap invoice diberi desimal unik kecil pada nominal supaya matching otomatis akurat.
+**Anti-replay** (cegah satu transaksi dipakai dua kali) adalah tanggung jawab sistem pemanggil — simpan `transactionId` dari hasil `/check-payment` di database kamu. Disarankan minta buyer bayar dengan **nominal unik** (pakai `amountToPay` dari `/payment-options`) supaya matching akurat.
 
 ## Testing
 
@@ -162,7 +154,7 @@ Tiap invoice diberi desimal unik kecil pada nominal supaya matching otomatis aku
 npm test         # atau: node --test
 ```
 
-Unit test mencakup logika matching: income/keluar, toleransi nominal, window waktu, dedupe anti-replay, dan matching deposit on-chain.
+Unit test mencakup logika matching: income/keluar, toleransi nominal, window waktu, dan matching deposit on-chain (pure functions, tanpa state).
 
 ## Konfigurasi (Environment)
 
@@ -170,16 +162,13 @@ Unit test mencakup logika matching: income/keluar, toleransi nominal, window wak
 |-----|---------|-----------|
 | `ACCEPTED_CURRENCIES` | `USDT` | Mata uang diterima (pisah koma) |
 | `ACCEPTED_NETWORKS` | `TRC20` | Jaringan on-chain diterima |
-| `INVOICE_EXPIRY_MINUTES` | `30` | Masa berlaku invoice |
 | `AMOUNT_TOLERANCE_PERCENT` | `0.5` | Toleransi selisih nominal |
-| `POLL_INTERVAL_SECONDS` | `20` | Interval poller (dev lokal) |
+| `UNIQUE_AMOUNT` | `true` | Saran nominal unik di `/payment-options` |
 | `RATE_LIMIT_MAX` | `60` | Max request per IP per window |
 | `RATE_LIMIT_WINDOW_MS` | `60000` | Window rate limit |
-| `KV_REST_API_URL` | - | Upstash/Vercel KV (opsional) |
-| `KV_REST_API_TOKEN` | - | Token KV (opsional) |
 
 ## Catatan
 
 - API Key cukup permission **Enable Reading** — jangan aktifkan trading/withdraw
-- Poller background hanya jalan di dev lokal / VPS, bukan di Vercel (pakai `/check` on-demand)
+- Server stateless — tidak ada database, tidak ada poller; pengecekan via `/check-payment` on-demand
 - Untuk lihat semua history > 7 hari, pakai mode `full` di `/debug/pay-history`
