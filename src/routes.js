@@ -7,6 +7,20 @@ const matcher = require('./paymentMatcher');
 
 const router = express.Router();
 
+// Cache deposit address (stabil per akun+coin+network, tidak berubah).
+// Key: apiKey:coin:network -> { address, tag }. TTL 6 jam.
+const addrCache = new Map();
+const ADDR_TTL = 6 * 60 * 60 * 1000;
+
+async function getCachedAddress(coin, network, cfg) {
+  const key = `${cfg.apiKey}:${coin}:${network}`;
+  const hit = addrCache.get(key);
+  if (hit && Date.now() - hit.at < ADDR_TTL) return hit.data;
+  const data = await client.getDepositAddress({ coin, network, cfg });
+  addrCache.set(key, { data, at: Date.now() });
+  return data;
+}
+
 // ----------------------------------------------------------------
 // Helpers
 // ----------------------------------------------------------------
@@ -49,7 +63,7 @@ async function buildPaymentOptions(amount, currency, network, cfg) {
     const networks = net ? [net] : cfg.acceptedNetworks;
     // ambil address paralel dari Binance (selalu address terkini + memo/tag)
     const fetches = networks.map((n) =>
-      client.getDepositAddress({ coin: currency, network: n, cfg })
+      getCachedAddress(currency, n, cfg)
         .then((a) => ({ n, a }))
         .catch((e) => ({ n, err: e.message }))
     );
