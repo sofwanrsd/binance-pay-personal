@@ -1,16 +1,23 @@
-import React, { useState } from 'react';
-import Credentials from './components/Credentials.jsx';
-import CreateInvoice from './components/CreateInvoice.jsx';
-import CheckInvoice from './components/CheckInvoice.jsx';
-import InvoiceList from './components/InvoiceList.jsx';
-import DebugPanel from './components/DebugPanel.jsx';
+import React, { useState, useEffect } from 'react';
+import Dashboard from './components/Dashboard.jsx';
+import Docs from './components/Docs.jsx';
 
 export default function App() {
-  // dipakai untuk trigger refresh list dari komponen lain
-  const [refreshKey, setRefreshKey] = useState(0);
-  const [checkId, setCheckId] = useState('');
+  const [path, setPath] = useState(window.location.pathname);
 
-  const refreshList = () => setRefreshKey((k) => k + 1);
+  useEffect(() => {
+    const onPop = () => setPath(window.location.pathname);
+    window.addEventListener('popstate', onPop);
+    return () => window.removeEventListener('popstate', onPop);
+  }, []);
+
+  const nav = (to) => {
+    window.history.pushState({}, '', to);
+    setPath(to);
+    window.scrollTo(0, 0);
+  };
+
+  const isDocs = path.startsWith('/docs');
 
   return (
     <>
@@ -24,16 +31,13 @@ export default function App() {
           </span>
           <h1>Binance Pay Gateway</h1>
         </div>
-        <a className="nav" href="/docs">API Docs</a>
+        <nav className="topnav">
+          <a className={`nav ${!isDocs ? 'active' : ''}`} onClick={() => nav('/')}>Dashboard</a>
+          <a className={`nav ${isDocs ? 'active' : ''}`} onClick={() => nav('/docs')}>API Docs</a>
+        </nav>
       </div>
 
-      <div className="container">
-        <Credentials />
-        <CreateInvoice onCreated={refreshList} setCheckId={setCheckId} />
-        <CheckInvoice checkId={checkId} setCheckId={setCheckId} onChange={refreshList} />
-        <InvoiceList refreshKey={refreshKey} onSelect={setCheckId} />
-        <DebugPanel />
-      </div>
+      {isDocs ? <Docs /> : <Dashboard />}
     </>
   );
 }

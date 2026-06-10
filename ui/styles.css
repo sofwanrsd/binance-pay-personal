@@ -86,9 +86,34 @@ a{color:inherit}
 .empty-state{text-align:center;padding:36px;color:var(--muted2);font-size:13px}
 .saved-msg{font-size:12px;color:#4ade80;font-weight:600}
 
+.topnav{display:flex;gap:8px}
+.nav{cursor:pointer;font-size:13px;font-weight:500;color:var(--muted);text-decoration:none;padding:7px 14px;border:1px solid var(--border2);border-radius:8px;transition:all .2s}
+.nav:hover{color:var(--accent);border-color:var(--accent);background:rgba(139,124,255,.08)}
+.nav.active{color:var(--accent);border-color:var(--accent);background:rgba(139,124,255,.12)}
+
+.creds-pill{display:inline-flex;align-items:center;gap:9px;margin-top:14px;padding:9px 14px;border-radius:9px;background:#0a0c10;border:1px solid var(--border2);font-size:12.5px;color:var(--muted)}
+.creds-pill .dot{width:8px;height:8px;border-radius:50%;background:#4a5160;flex-shrink:0}
+.creds-pill.ok{color:#cdd2dd}
+.creds-pill.ok .dot{background:#22c55e;box-shadow:0 0 10px #22c55e}
+
+.card.endpoint{padding:0;overflow:hidden}
+.ep-head{display:flex;align-items:center;gap:12px;padding:16px 20px;cursor:pointer;transition:background .15s}
+.ep-head:hover{background:rgba(139,124,255,.04)}
+.ep-method{font-size:11px;font-weight:700;letter-spacing:.05em;color:#0a0c14;padding:4px 9px;border-radius:6px;min-width:54px;text-align:center}
+.ep-path{font-family:'JetBrains Mono',ui-monospace,monospace;font-size:13px;font-weight:600;color:var(--txt)}
+.ep-summary{flex:1;font-size:12.5px;color:var(--muted);text-align:right}
+.ep-chevron{font-size:20px;color:var(--muted2);transition:transform .2s;line-height:1}
+.ep-body{padding:0 20px 20px;border-top:1px solid var(--border);animation:rise .25s ease}
+.ep-desc{font-size:12.5px;color:var(--muted);line-height:1.6;margin:16px 0 4px;white-space:pre-wrap}
+.ep-section{margin-top:16px}
+.ep-textarea{width:100%;background:#0a0c10;border:1px solid var(--border2);border-radius:9px;padding:12px;color:var(--txt);font-family:'JetBrains Mono',ui-monospace,monospace;font-size:12.5px;line-height:1.55;outline:none;resize:vertical;transition:all .18s;margin-top:8px}
+.ep-textarea:focus{border-color:var(--accent);box-shadow:0 0 0 3px rgba(139,124,255,.18)}
+.ep-pre{background:#0a0c10;border:1px solid var(--border);border-radius:9px;padding:14px;margin-top:8px;font-family:'JetBrains Mono',ui-monospace,monospace;font-size:12px;line-height:1.55;color:#cdd2dd;overflow-x:auto;max-height:420px;overflow-y:auto;white-space:pre-wrap;word-break:break-word}
+
 @media(max-width:600px){
   .form-grid,.form-grid.three{grid-template-columns:1fr}
   .container{padding:18px 12px 40px}
   .card{padding:18px}
   .topbar{padding:12px 16px}
+  .ep-summary{display:none}
 }
