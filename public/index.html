@@ -125,6 +125,19 @@
     <div id="invoiceList"><div class="empty-state">Klik Refresh untuk memuat</div></div>
   </div>
 
+  <div class="card">
+    <h2>Debug — Cek Koneksi Binance</h2>
+    <div class="form-grid">
+      <div class="field"><label>Berapa jam ke belakang (max 168)</label><input type="number" id="debugHours" value="24" min="1" max="168" /></div>
+      <div class="field"><label>Filter Coin (opsional, untuk deposit)</label><input type="text" id="debugCoin" placeholder="USDT" /></div>
+    </div>
+    <div class="btn-row">
+      <button class="btn btn-yellow" onclick="debugPay()">Cek Pay History</button>
+      <button class="btn btn-outline" onclick="debugDeposit()">Cek Deposit History</button>
+    </div>
+    <div id="debugResult"></div>
+  </div>
+
 </div>
 <script>
 const API='/api';
@@ -203,6 +216,29 @@ async function loadList(){
       '<div class="inv-list-left"><div class="inv-list-id">'+inv.id+'</div><div class="inv-list-amount">'+inv.expectedAmount+' '+inv.currency+'</div></div>'+
       '<span class="status-badge '+(m[inv.status]||'badge-pending')+'">'+inv.status+'</span></div>';
   }).join('');
+}
+async function debugPay(){
+  const el=document.getElementById('debugResult');
+  const hours=document.getElementById('debugHours').value||24;
+  el.innerHTML='<div class="alert alert-info"><span class="spinner"></span>Mengambil Pay History dari Binance...</div>';
+  const {ok,data}=await req('/debug/pay-history',{method:'POST',body:JSON.stringify({hours:Number(hours)})});
+  if(!ok){el.innerHTML='<div class="alert alert-error">'+(data.error||'Error')+' '+(data.code?'(code: '+data.code+')':'')+'</div>';return;}
+  const rows=data.transactions.length===0
+    ?'<div class="empty-state">Tidak ada transaksi Pay dalam '+data.hoursBack+' jam terakhir</div>'
+    :data.transactions.map(t=>'<div class="inv-row"><span class="inv-label">'+new Date(Number(t.transactionTime)).toLocaleString('id-ID')+'</span><span class="inv-value">'+(Number(t.amount)>0?'+':'')+t.amount+' '+t.currency+' &nbsp; <span style="color:#555;font-size:11px">'+t.transactionId+'</span></span></div>').join('');
+  el.innerHTML='<div class="alert alert-success">Koneksi OK — '+data.count+' transaksi Pay dalam '+data.hoursBack+' jam terakhir</div><div class="invoice-card">'+rows+'</div>';
+}
+async function debugDeposit(){
+  const el=document.getElementById('debugResult');
+  const hours=document.getElementById('debugHours').value||24;
+  const coin=document.getElementById('debugCoin').value.trim();
+  el.innerHTML='<div class="alert alert-info"><span class="spinner"></span>Mengambil Deposit History dari Binance...</div>';
+  const {ok,data}=await req('/debug/deposit-history',{method:'POST',body:JSON.stringify({hours:Number(hours),coin:coin||undefined})});
+  if(!ok){el.innerHTML='<div class="alert alert-error">'+(data.error||'Error')+' '+(data.code?'(code: '+data.code+')':'')+'</div>';return;}
+  const rows=data.deposits.length===0
+    ?'<div class="empty-state">Tidak ada deposit dalam '+data.hoursBack+' jam terakhir'+(coin?' ('+coin+')':'')+'</div>'
+    :data.deposits.map(d=>'<div class="inv-row"><span class="inv-label">'+new Date(Number(d.insertTime)).toLocaleString('id-ID')+' &nbsp; '+d.network+'</span><span class="inv-value">+'+d.amount+' '+d.coin+' &nbsp; <span style="color:#555;font-size:11px">'+d.id+'</span></span></div>').join('');
+  el.innerHTML='<div class="alert alert-success">Koneksi OK — '+data.count+' deposit dalam '+data.hoursBack+' jam terakhir</div><div class="invoice-card">'+rows+'</div>';
 }
 window.addEventListener('DOMContentLoaded',()=>{
   const c=getCreds();

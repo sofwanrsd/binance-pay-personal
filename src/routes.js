@@ -261,4 +261,50 @@ router.post('/invoices/:id/claim', async (req, res) => {
   }
 });
 
+// ----------------------------------------------------------------
+// POST /api/debug/pay-history — test koneksi + cek riwayat Pay
+// ----------------------------------------------------------------
+router.post('/debug/pay-history', async (req, res) => {
+  const cfg = config.fromRequest(req);
+  if (!cfg.apiKey || !cfg.apiSecret) {
+    return res.status(400).json({ error: 'API Key dan Secret belum diisi' });
+  }
+  try {
+    const { hours = 24 } = req.body || {};
+    const startTime = Date.now() - Math.min(Number(hours) || 24, 168) * 60 * 60 * 1000;
+    const txs = await client.getPayTransactions({ startTime, endTime: Date.now(), limit: 100, cfg });
+    res.json({
+      ok: true,
+      count: txs.length,
+      hoursBack: Math.min(Number(hours) || 24, 168),
+      transactions: txs,
+    });
+  } catch (err) {
+    res.status(502).json({ ok: false, error: err.message, code: err.code });
+  }
+});
+
+// ----------------------------------------------------------------
+// POST /api/debug/deposit-history — test koneksi + cek riwayat deposit on-chain
+// ----------------------------------------------------------------
+router.post('/debug/deposit-history', async (req, res) => {
+  const cfg = config.fromRequest(req);
+  if (!cfg.apiKey || !cfg.apiSecret) {
+    return res.status(400).json({ error: 'API Key dan Secret belum diisi' });
+  }
+  try {
+    const { hours = 24, coin } = req.body || {};
+    const startTime = Date.now() - Math.min(Number(hours) || 24, 168) * 60 * 60 * 1000;
+    const deposits = await client.getDepositHistory({ startTime, endTime: Date.now(), coin: coin || undefined, limit: 100, cfg });
+    res.json({
+      ok: true,
+      count: deposits.length,
+      hoursBack: Math.min(Number(hours) || 24, 168),
+      deposits,
+    });
+  } catch (err) {
+    res.status(502).json({ ok: false, error: err.message, code: err.code });
+  }
+});
+
 module.exports = router;
