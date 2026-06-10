@@ -3,6 +3,7 @@ import Dashboard from './components/Dashboard.jsx';
 import Docs from './components/Docs.jsx';
 import Tutorial from './components/Tutorial.jsx';
 import PrivacyPopup from './components/PrivacyPopup.jsx';
+import ErrorBoundary from './components/ErrorBoundary.jsx';
 
 export default function App() {
   const [path, setPath] = useState(window.location.pathname);
@@ -43,7 +44,9 @@ export default function App() {
         </nav>
       </div>
 
-      {isDocs ? <Docs /> : isTutorial ? <div className="container"><Tutorial /></div> : <Dashboard />}
+      <ErrorBoundary>
+        {isDocs ? <Docs /> : isTutorial ? <div className="container"><Tutorial /></div> : <Dashboard />}
+      </ErrorBoundary>
     </>
   );
 }
