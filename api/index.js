@@ -19,10 +19,11 @@ if (process.env.NODE_ENV !== 'production') {
 
 app.get('/api/health', (req, res) => res.json({ ok: true, ts: Date.now() }));
 
-// Mount semua routes di /api (dengan rate limiting)
+// Mount semua routes di /api (access guard + rate limiting)
+const accessGuard = require('../src/accessGuard');
 const rateLimit = require('../src/rateLimit');
 const routes = require('../src/routes');
-app.use('/api', rateLimit, routes);
+app.use('/api', accessGuard, rateLimit, routes);
 
 app.use((err, req, res, next) => {
   console.error('[unhandled]', err.message);

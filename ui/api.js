@@ -18,12 +18,23 @@ export function clearCreds() {
   ['bnApiKey', 'bnApiSecret', 'bnPayId'].forEach((k) => localStorage.removeItem(k));
 }
 
+export function getAppKey() {
+  return localStorage.getItem('bnAppKey') || '';
+}
+
+export function setAppKey(v) {
+  if (v) localStorage.setItem('bnAppKey', v);
+  else localStorage.removeItem('bnAppKey');
+}
+
 function headers() {
   const c = getCreds();
   const h = { 'Content-Type': 'application/json' };
   if (c.apiKey) h['X-Binance-Api-Key'] = c.apiKey;
   if (c.apiSecret) h['X-Binance-Api-Secret'] = c.apiSecret;
   if (c.payId) h['X-Binance-Pay-Id'] = c.payId;
+  const appKey = getAppKey();
+  if (appKey) h['X-App-Key'] = appKey;
   return h;
 }
 

@@ -1,24 +1,28 @@
 import React, { useState } from 'react';
-import { getCreds, setCreds, clearCreds } from '../api.js';
+import { getCreds, setCreds, clearCreds, getAppKey, setAppKey } from '../api.js';
 
 export default function Credentials() {
   const init = getCreds();
   const [apiKey, setApiKey] = useState(init.apiKey);
   const [apiSecret, setApiSecret] = useState(init.apiSecret);
   const [payId, setPayId] = useState(init.payId);
+  const [appKey, setAppKeyState] = useState(getAppKey());
   const [saved, setSaved] = useState(false);
 
   const save = () => {
     setCreds({ apiKey, apiSecret, payId });
+    setAppKey(appKey);
     setSaved(true);
     setTimeout(() => setSaved(false), 2000);
   };
 
   const clear = () => {
     clearCreds();
+    setAppKey('');
     setApiKey('');
     setApiSecret('');
     setPayId('');
+    setAppKeyState('');
   };
 
   return (
@@ -39,6 +43,13 @@ export default function Credentials() {
           <label>Pay ID</label>
           <input type="text" value={payId} placeholder="123456789"
             onChange={(e) => setPayId(e.target.value)} />
+        </div>
+      </div>
+      <div className="form-grid">
+        <div className="field">
+          <label>App Key (kalau deployment diproteksi)</label>
+          <input type="password" value={appKey} placeholder="X-App-Key deployment"
+            onChange={(e) => setAppKeyState(e.target.value)} />
         </div>
       </div>
       <div className="btn-row">

@@ -30,6 +30,9 @@ const envConfig = {
   acceptedNetworks: (process.env.ACCEPTED_NETWORKS || 'TRC20,BEP20')
     .split(',').map((s) => s.trim().toUpperCase()).filter(Boolean),
   onChainEnabled: (process.env.ONCHAIN_ENABLED || 'true').toLowerCase() !== 'false',
+  // Access key untuk membatasi siapa yang boleh pakai deployment ini.
+  // Kosong = terbuka (tidak disarankan untuk URL publik).
+  appAccessKey: process.env.APP_ACCESS_KEY || '',
   port: parseInt(process.env.PORT || '3000', 10),
 };
 
