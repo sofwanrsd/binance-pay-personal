@@ -139,6 +139,38 @@ function normalizeNetwork(network) {
   return NETWORK_LABEL_MAP[String(network).toUpperCase()] || String(network).toUpperCase();
 }
 
+/** Kebalikan: label umum (TRC20) -> kode network Binance (TRX). */
+const NETWORK_CODE_MAP = {
+  TRC20: 'TRX', BEP20: 'BSC', ERC20: 'ETH', BEP2: 'BNB',
+  SOL: 'SOL', MATIC: 'MATIC', AVAXC: 'AVAXC', ARBITRUM: 'ARB', OPTIMISM: 'OP',
+};
+
+function toBinanceNetwork(label) {
+  const up = String(label).toUpperCase();
+  return NETWORK_CODE_MAP[up] || up;
+}
+
+/**
+ * Ambil deposit address resmi dari Binance untuk coin + network tertentu.
+ * Selalu address terkini dari akun, termasuk memo/tag kalau ada.
+ * @param {object} opts
+ * @param {string} opts.coin     contoh "USDT"
+ * @param {string} opts.network  label umum (TRC20/BEP20) atau kode Binance
+ * @param {object} opts.cfg
+ * @returns {Promise<{address:string, tag:string, coin:string, network:string, url:string}>}
+ */
+async function getDepositAddress({ coin, network, cfg }) {
+  const net = toBinanceNetwork(network);
+  const json = await signedGet('/sapi/v1/capital/deposit/address', { coin, network: net }, cfg);
+  return {
+    address: json.address || '',
+    tag: json.tag || '',
+    coin: json.coin || coin,
+    network: normalizeNetwork(net),
+    url: json.url || '',
+  };
+}
+
 /**
  * Ambil SEMUA riwayat Binance Pay dalam rentang waktu, dengan looping.
  * Binance Pay membatasi 100 record per call + rentang per call. Fungsi ini

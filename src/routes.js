@@ -26,7 +26,7 @@ function suggestUniqueAmount(base, cfg) {
   return round8(base + extra);
 }
 
-function buildPaymentOptions(amount, currency, network, cfg) {
+async function buildPaymentOptions(amount, currency, network, cfg) {
   const options = [];
   const net = network ? String(network).toUpperCase() : null;
 
@@ -47,20 +47,31 @@ function buildPaymentOptions(amount, currency, network, cfg) {
 
   if (cfg.onChainEnabled && (!net || net !== 'PAY')) {
     const networks = net ? [net] : cfg.acceptedNetworks;
-    for (const n of networks) {
-      const address = cfg.depositAddresses[n];
-      if (!address) continue;
-      options.push({
+    // ambil address paralel dari Binance (selalu address terkini + memo/tag)
+    const fetches = networks.map((n) =>
+      client.getDepositAddress({ coin: currency, network: n, cfg })
+        .then((a) => ({ n, a }))
+        .catch((e) => ({ n, err: e.message }))
+    );
+    const results = await Promise.all(fetches);
+    for (const r of results) {
+      if (r.err || !r.a || !r.a.address) continue;
+      const opt = {
         method: 'ONCHAIN',
-        network: n,
-        description: 'Transfer on-chain via ' + n,
-        depositAddress: address,
+        network: r.n,
+        description: 'Transfer on-chain via ' + r.n,
+        depositAddress: r.a.address,
         amountToPay: amount,
         currency,
         instruction:
-          'Kirim TEPAT ' + amount + ' ' + currency + ' via jaringan ' + n +
-          ' ke address: ' + address,
-      });
+          'Kirim TEPAT ' + amount + ' ' + currency + ' via jaringan ' + r.n +
+          ' ke address: ' + r.a.address,
+      };
+      if (r.a.tag) {
+        opt.memo = r.a.tag;
+        opt.instruction += ' (WAJIB sertakan MEMO/Tag: ' + r.a.tag + ')';
+      }
+      options.push(opt);
     }
   }
 
@@ -73,7 +84,7 @@ function buildPaymentOptions(amount, currency, network, cfg) {
 // Sistem pemanggil yang menyimpan nominal ini untuk dicek nanti.
 // body: { amount, currency?, network? }
 // ----------------------------------------------------------------
-router.post('/payment-options', (req, res) => {
+router.post('/payment-options', async (req, res) => {
   const cfg = config.fromRequest(req);
   const { amount, currency, network } = req.body || {};
 

@@ -27,11 +27,7 @@ const envConfig = {
   pollIntervalSeconds: num('POLL_INTERVAL_SECONDS', 20),
   matchGraceMinutes: num('MATCH_GRACE_MINUTES', 10),
   maxClaimAttempts: num('MAX_CLAIM_ATTEMPTS', 10),
-  depositAddresses: (() => {
-    try { return JSON.parse(process.env.DEPOSIT_ADDRESSES || '{}'); }
-    catch (e) { return {}; }
-  })(),
-  acceptedNetworks: (process.env.ACCEPTED_NETWORKS || 'TRC20')
+  acceptedNetworks: (process.env.ACCEPTED_NETWORKS || 'TRC20,BEP20')
     .split(',').map((s) => s.trim().toUpperCase()).filter(Boolean),
   onChainEnabled: (process.env.ONCHAIN_ENABLED || 'true').toLowerCase() !== 'false',
   port: parseInt(process.env.PORT || '3000', 10),
