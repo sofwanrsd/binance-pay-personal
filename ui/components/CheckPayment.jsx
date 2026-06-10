@@ -60,9 +60,13 @@ export default function CheckPayment() {
             <input type="text" value={currency} onChange={(e) => setCurrency(e.target.value)} />
           </div>
           <div className="field">
-            <label>Network (opsional)</label>
-            <input type="text" value={network} placeholder="TRC20 / BEP20 / PAY"
-              onChange={(e) => setNetwork(e.target.value)} />
+            <label>Metode / Network</label>
+            <select value={network} onChange={(e) => setNetwork(e.target.value)}>
+              <option value="">Semua metode</option>
+              <option value="PAY">Binance Pay (Pay ID)</option>
+              <option value="TRC20">On-chain — TRC20 (Tron)</option>
+              <option value="BEP20">On-chain — BEP20 (BSC)</option>
+            </select>
           </div>
           <div className="field">
             <label>Window cek (menit)</label>

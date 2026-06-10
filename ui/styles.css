@@ -36,6 +36,9 @@ a{color:inherit}
 .field input{background:#0a0c10;border:1px solid var(--border2);border-radius:9px;padding:11px 13px;color:var(--txt);font-size:13.5px;outline:none;transition:all .18s;width:100%}
 .field input::placeholder{color:#444a55}
 .field input:focus{border-color:var(--accent);box-shadow:0 0 0 3px rgba(139,124,255,.18);background:#0d111b}
+.field select{background:#0a0c10;border:1px solid var(--border2);border-radius:9px;padding:11px 13px;color:var(--txt);font-size:13.5px;outline:none;transition:all .18s;width:100%;cursor:pointer;font-family:inherit;appearance:none;background-image:url("data:image/svg+xml;charset=utf-8,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%23828aa0' stroke-width='3'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E");background-repeat:no-repeat;background-position:right 13px center;padding-right:34px}
+.field select:focus{border-color:var(--accent);box-shadow:0 0 0 3px rgba(139,124,255,.18);background-color:#0d111b}
+.field select option{background:#151a26;color:var(--txt)}
 
 .btn{padding:10px 18px;border-radius:9px;border:1px solid transparent;font-size:13px;font-weight:600;cursor:pointer;transition:all .18s;letter-spacing:.01em;font-family:inherit}
 .btn:active{transform:translateY(1px)}
