@@ -270,7 +270,25 @@ router.post('/debug/pay-history', async (req, res) => {
     return res.status(400).json({ error: 'API Key dan Secret belum diisi' });
   }
   try {
-    const { hours = 24 } = req.body || {};
+    const { hours = 24, full = false, days } = req.body || {};
+
+    // Mode full: ambil semua transaksi mundur (default 90 hari, max 365)
+    if (full) {
+      const lookbackDays = Math.min(Number(days) || 90, 365);
+      const startTime = Date.now() - lookbackDays * 24 * 60 * 60 * 1000;
+      const result = await client.getAllPayTransactions({ startTime, endTime: Date.now(), cfg });
+      return res.json({
+        ok: true,
+        full: true,
+        count: result.transactions.length,
+        daysBack: lookbackDays,
+        apiCalls: result.calls,
+        truncated: result.truncated,
+        transactions: result.transactions,
+      });
+    }
+
+    // Mode cepat: rentang jam (max 7 hari)
     const startTime = Date.now() - Math.min(Number(hours) || 24, 168) * 60 * 60 * 1000;
     const txs = await client.getPayTransactions({ startTime, endTime: Date.now(), limit: 100, cfg });
     res.json({

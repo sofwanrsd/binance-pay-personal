@@ -139,4 +139,53 @@ function normalizeNetwork(network) {
   return NETWORK_LABEL_MAP[String(network).toUpperCase()] || String(network).toUpperCase();
 }
 
-module.exports = { getPayTransactions, getDepositHistory, normalizeNetwork, sign, signedGet };
+/**
+ * Ambil SEMUA riwayat Binance Pay dalam rentang waktu, dengan looping.
+ * Binance Pay membatasi 100 record per call + rentang per call. Fungsi ini
+ * memecah rentang jadi window 30 hari (dari terbaru ke terlama) dan
+ * melakukan adaptive split kalau sebuah window penuh (>=100 record),
+ * supaya tidak ada transaksi yang terlewat. Dedupe via transactionId.
+ *
+ * @param {object} opts
+ * @param {number} opts.startTime epoch ms
+ * @param {number} opts.endTime   epoch ms
+ * @param {object} opts.cfg       config dari fromRequest(req)
+ * @param {number} [opts.maxCalls] batas jumlah API call (anti rate-limit)
+ * @returns {Promise<{transactions: Array, calls: number, truncated: boolean}>}
+ */
+async function getAllPayTransactions({ startTime, endTime, cfg, maxCalls = 60 } = {}) {
+  const all = [];
+  const seen = new Set();
+  let calls = 0;
+  let truncated = false;
+  const WINDOW = 30 * 24 * 60 * 60 * 1000; // 30 hari per window
+
+  async function fetchWindow(s, e) {
+    if (truncated || s >= e) return;
+    if (calls >= maxCalls) { truncated = true; return; }
+    calls++;
+    const txs = await getPayTransactions({ startTime: s, endTime: e, limit: 100, cfg });
+    for (const t of txs) {
+      const id = String(t.transactionId);
+      if (!seen.has(id)) { seen.add(id); all.push(t); }
+    }
+    // window penuh -> mungkin ada lebih -> pecah dua
+    if (txs.length >= 100) {
+      const mid = Math.floor((s + e) / 2);
+      await fetchWindow(mid + 1, e);
+      await fetchWindow(s, mid);
+    }
+  }
+
+  let we = endTime;
+  while (we > startTime && !truncated) {
+    const ws = Math.max(startTime, we - WINDOW);
+    await fetchWindow(ws, we);
+    we = ws - 1;
+  }
+
+  all.sort((a, b) => Number(b.transactionTime) - Number(a.transactionTime));
+  return { transactions: all, calls, truncated };
+}
+
+module.exports = { getPayTransactions, getAllPayTransactions, getDepositHistory, normalizeNetwork, sign, signedGet };

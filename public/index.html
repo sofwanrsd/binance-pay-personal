@@ -133,6 +133,7 @@
     </div>
     <div class="btn-row">
       <button class="btn btn-yellow" onclick="debugPay()">Cek Pay History</button>
+      <button class="btn btn-green" onclick="debugPayFull()">Pay History Full (90 hari)</button>
       <button class="btn btn-outline" onclick="debugDeposit()">Cek Deposit History</button>
       <button class="btn btn-outline" onclick="debugWithdraw()">Cek Withdraw History</button>
       <button class="btn btn-outline" onclick="debugBalances()">Cek Saldo</button>
@@ -229,6 +230,17 @@ async function debugPay(){
     ?'<div class="empty-state">Tidak ada transaksi Pay dalam '+data.hoursBack+' jam terakhir</div>'
     :data.transactions.map(t=>'<div class="inv-row"><span class="inv-label">'+new Date(Number(t.transactionTime)).toLocaleString('id-ID')+'</span><span class="inv-value">'+(Number(t.amount)>0?'+':'')+t.amount+' '+t.currency+' &nbsp; <span style="color:#555;font-size:11px">'+t.transactionId+'</span></span></div>').join('');
   el.innerHTML='<div class="alert alert-success">Koneksi OK — '+data.count+' transaksi Pay dalam '+data.hoursBack+' jam terakhir</div><div class="invoice-card">'+rows+'</div>';
+}
+async function debugPayFull(){
+  const el=document.getElementById('debugResult');
+  el.innerHTML='<div class="alert alert-info"><span class="spinner"></span>Mengambil SEMUA Pay History (bisa 10-30 detik)...</div>';
+  const {ok,data}=await req('/debug/pay-history',{method:'POST',body:JSON.stringify({full:true,days:90})});
+  if(!ok){el.innerHTML='<div class="alert alert-error">'+(data.error||'Error')+' '+(data.code?'(code: '+data.code+')':'')+'</div>';return;}
+  const rows=data.transactions.length===0
+    ?'<div class="empty-state">Tidak ada transaksi Pay dalam '+data.daysBack+' hari terakhir</div>'
+    :data.transactions.map(t=>'<div class="inv-row"><span class="inv-label">'+new Date(Number(t.transactionTime)).toLocaleString('id-ID')+'</span><span class="inv-value">'+(Number(t.amount)>0?'+':'')+t.amount+' '+t.currency+' &nbsp; <span style="color:#555;font-size:11px">'+t.transactionId+'</span></span></div>').join('');
+  const warn=data.truncated?' <span style="color:#eab308">(terpotong, ada lebih banyak)</span>':'';
+  el.innerHTML='<div class="alert alert-success">'+data.count+' transaksi Pay dalam '+data.daysBack+' hari ('+data.apiCalls+' API call)'+warn+'</div><div class="invoice-card">'+rows+'</div>';
 }
 async function debugDeposit(){
   const el=document.getElementById('debugResult');
