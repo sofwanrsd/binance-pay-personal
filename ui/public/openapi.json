@@ -30,26 +30,6 @@
       }
     },
     "schemas": {
-      "Invoice": {
-        "type": "object",
-        "properties": {
-          "id": { "type": "string", "example": "INV1A2B3C4DABCD" },
-          "status": { "type": "string", "enum": ["PENDING", "PAID", "EXPIRED"] },
-          "currency": { "type": "string", "example": "USDT" },
-          "baseAmount": { "type": "number", "example": 5.00 },
-          "expectedAmount": { "type": "number", "example": 5.0037 },
-          "network": { "type": "string", "example": "TRC20", "nullable": true },
-          "productId": { "type": "string", "nullable": true },
-          "buyer": { "type": "string", "nullable": true },
-          "createdAt": { "type": "integer", "example": 1749563004000 },
-          "expiresAt": { "type": "integer", "example": 1749564804000 },
-          "transactionId": { "type": "string", "nullable": true },
-          "paidAmount": { "type": "number", "nullable": true },
-          "paidAt": { "type": "integer", "nullable": true },
-          "payMethod": { "type": "string", "enum": ["PAY", "ONCHAIN"], "nullable": true },
-          "txHash": { "type": "string", "nullable": true }
-        }
-      },
       "PaymentOption": {
         "type": "object",
         "properties": {

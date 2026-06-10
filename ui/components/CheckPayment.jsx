@@ -90,7 +90,7 @@ export default function CheckPayment() {
             <div className="alert alert-info">
               Minta buyer bayar TEPAT <strong>{options.amountToPay} {options.currency}</strong> (toleransi {options.tolerancePercent}%)
             </div>
-            {(options.paymentOptions || []).map((o, i) => (
+            {(Array.isArray(options.paymentOptions) ? options.paymentOptions : []).map((o, i) => (
               <div className="pay-option" key={i}>
                 <div className="method-label">{o.method.replace('_', ' ')}</div>
                 {o.method === 'BINANCE_PAY' ? (

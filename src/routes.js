@@ -105,12 +105,13 @@ router.post('/payment-options', async (req, res) => {
   }
 
   const amountToPay = suggestUniqueAmount(base, cfg);
+  const paymentOptions = await buildPaymentOptions(amountToPay, cur, net, cfg);
   res.json({
     amountToPay,
     currency: cur,
     network: net,
     tolerancePercent: cfg.amountTolerancePercent,
-    paymentOptions: buildPaymentOptions(amountToPay, cur, net, cfg),
+    paymentOptions,
   });
 });
 
