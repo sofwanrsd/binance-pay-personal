@@ -1,6 +1,7 @@
 'use strict';
 
 const express = require('express');
+const crypto = require('crypto');
 const config = require('./config');
 const client = require('./binanceSpotClient');
 const matcher = require('./paymentMatcher');
@@ -31,13 +32,30 @@ function round8(n) {
 
 /**
  * Saran nominal unik: tambah desimal acak kecil supaya tiap tagihan
- * punya nominal khas dan mudah dicocokkan. Sistem pemanggil yang menyimpan
- * nominal ini, server tidak menyimpan apa pun.
+ * punya nominal khas dan mudah dicocokkan.
+ *
+ * Pakai crypto.randomInt (distribusi merata, bukan Math.random).
+ * Ruang default 0..uniqueAmountMax dengan presisi sampai 6 desimal
+ * -> ribuan slot, jauh kurangi peluang tabrakan.
+ *
+ * PENTING: server STATELESS, tidak tahu nominal mana sedang dipakai.
+ * Pencegahan tabrakan FINAL adalah tanggung jawab caller — caller boleh
+ * kirim `exclude: [angka,...]` (nominal PENDING miliknya) supaya server
+ * menghindarinya.
  */
-function suggestUniqueAmount(base, cfg) {
+function suggestUniqueAmount(base, cfg, exclude = []) {
   if (!cfg.uniqueAmount) return round8(base);
-  const extra = Math.round(Math.random() * cfg.uniqueAmountMax * 10000) / 10000;
-  return round8(base + extra);
+  const max = cfg.uniqueAmountMax;            // contoh 0.0099
+  const steps = Math.max(1, Math.round(max * 1e6)); // presisi 6 desimal
+  const taken = new Set((exclude || []).map((v) => round8(Number(v))));
+
+  for (let i = 0; i < 25; i++) {
+    const extra = crypto.randomInt(0, steps + 1) / 1e6;
+    const candidate = round8(base + extra);
+    if (!taken.has(candidate)) return candidate;
+  }
+  // fallback: tetap kembalikan walau tak ideal (caller harus cek ulang)
+  return round8(base + crypto.randomInt(0, steps + 1) / 1e6);
 }
 
 async function buildPaymentOptions(amount, currency, network, cfg) {
@@ -96,11 +114,13 @@ async function buildPaymentOptions(amount, currency, network, cfg) {
 // POST /api/payment-options
 // Bangun instruksi pembayaran + saran nominal unik (STATELESS).
 // Sistem pemanggil yang menyimpan nominal ini untuk dicek nanti.
-// body: { amount, currency?, network? }
+// body: { amount, currency?, network?, exclude?: number[] }
+//   exclude = daftar nominal PENDING milik caller, agar server
+//   menghindari tabrakan nominal. WAJIB dicek ulang di sisi caller.
 // ----------------------------------------------------------------
 router.post('/payment-options', async (req, res) => {
   const cfg = config.fromRequest(req);
-  const { amount, currency, network } = req.body || {};
+  const { amount, currency, network, exclude } = req.body || {};
 
   const base = Number(amount);
   if (!base || base <= 0) {

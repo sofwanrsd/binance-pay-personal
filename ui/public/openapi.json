@@ -93,7 +93,8 @@
                 "properties": {
                   "amount": { "type": "number", "example": 5.00, "description": "Nominal dasar" },
                   "currency": { "type": "string", "example": "USDT", "description": "Mata uang (default USDT)" },
-                  "network": { "type": "string", "example": "TRC20", "description": "Batasi ke satu network. Kosongkan untuk semua. PAY = Binance Pay only." }
+                  "network": { "type": "string", "example": "TRC20", "description": "Batasi ke satu network. Kosongkan untuk semua. PAY = Binance Pay only." },
+                  "exclude": { "type": "array", "items": { "type": "number" }, "example": [5.0037, 5.0041], "description": "Daftar nominal PENDING milikmu agar server menghindari tabrakan. WAJIB tetap dicek ulang di sisi caller." }
                 }
               }
             }
