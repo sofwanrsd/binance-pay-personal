@@ -39,11 +39,12 @@ const envConfig = {
 
 /**
  * Buat config dari request Express.
- * Credentials bisa dikirim lewat header dari UI (localStorage):
+ * Credentials WAJIB dikirim lewat header per-request (mode API provider):
  *   X-Binance-Api-Key, X-Binance-Api-Secret, X-Binance-Pay-Id
  *
- * Field lain (toleransi, expiry, dll) tetap dari env supaya
- * tidak bisa dimanipulasi per-request dari luar.
+ * Tidak ada fallback ke env var, supaya deployment publik tidak
+ * membocorkan akun pemilik server. Setiap pemanggil pakai akunnya sendiri.
+ * Field lain (toleransi, expiry, dll) tetap dari env.
  *
  * @param {import('express').Request} req
  * @returns {typeof envConfig}
@@ -55,9 +56,9 @@ function fromRequest(req) {
 
   return {
     ...envConfig,
-    apiKey:    (headerKey    && headerKey.trim())    || envConfig.apiKey,
-    apiSecret: (headerSecret && headerSecret.trim()) || envConfig.apiSecret,
-    payId:     (headerPayId  && headerPayId.trim())  || envConfig.payId,
+    apiKey:    (headerKey    && headerKey.trim())    || '',
+    apiSecret: (headerSecret && headerSecret.trim()) || '',
+    payId:     (headerPayId  && headerPayId.trim())  || '',
   };
 }
 
