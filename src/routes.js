@@ -365,4 +365,74 @@ router.post('/debug/balances', async (req, res) => {
   }
 });
 
+// ----------------------------------------------------------------
+// POST /api/debug/overview — semua isi akun sekaligus (kayak buka Binance)
+// saldo + Pay + deposit + withdraw + convert + dividen, digabung timeline
+// ----------------------------------------------------------------
+router.post('/debug/overview', async (req, res) => {
+  const cfg = config.fromRequest(req);
+  if (!cfg.apiKey || !cfg.apiSecret) {
+    return res.status(400).json({ error: 'API Key dan Secret belum diisi' });
+  }
+
+  const { days = 30 } = req.body || {};
+  const lookbackDays = Math.min(Number(days) || 30, 90);
+  const startTime = Date.now() - lookbackDays * 24 * 60 * 60 * 1000;
+  const endTime = Date.now();
+
+  // safe: jalankan semua paralel, satu gagal tidak menggagalkan lainnya
+  const safe = (p) => p.then((v) => ({ ok: true, v })).catch((e) => ({ ok: false, e: e.message }));
+
+  const [bal, pay, dep, wd, conv, div] = await Promise.all([
+    safe(client.signedGet('/api/v3/account', {}, cfg)),
+    safe(client.getPayTransactions({ startTime, endTime, limit: 100, cfg })),
+    safe(client.getDepositHistory({ startTime, endTime, limit: 100, cfg })),
+    safe(client.signedGet('/sapi/v1/capital/withdraw/history', { startTime, endTime, limit: 100 }, cfg)),
+    safe(client.signedGet('/sapi/v1/convert/tradeFlow', { startTime, endTime, limit: 100 }, cfg)),
+    safe(client.signedGet('/sapi/v1/asset/assetDividend', { startTime, endTime, limit: 100 }, cfg)),
+  ]);
+
+  // saldo
+  const balances = bal.ok
+    ? (bal.v.balances || []).filter((b) => parseFloat(b.free) > 0 || parseFloat(b.locked) > 0)
+        .map((b) => ({ asset: b.asset, free: b.free, locked: b.locked }))
+    : [];
+
+  // timeline gabungan
+  const timeline = [];
+  if (pay.ok) for (const t of pay.v) {
+    timeline.push({ type: 'PAY', time: Number(t.transactionTime), amount: t.amount, asset: t.currency, ref: String(t.transactionId) });
+  }
+  if (dep.ok) for (const d of dep.v) {
+    timeline.push({ type: 'DEPOSIT', time: Number(d.insertTime), amount: d.amount, asset: d.coin, network: client.normalizeNetwork(d.network || ''), ref: String(d.id) });
+  }
+  if (wd.ok && Array.isArray(wd.v)) for (const w of wd.v) {
+    timeline.push({ type: 'WITHDRAW', time: new Date(w.applyTime).getTime(), amount: '-' + w.amount, asset: w.coin, network: w.network, ref: String(w.id) });
+  }
+  if (conv.ok && Array.isArray(conv.v.list)) for (const c of conv.v.list) {
+    timeline.push({ type: 'CONVERT', time: Number(c.createTime), amount: c.fromAmount + ' ' + c.fromAsset + ' -> ' + c.toAmount, asset: c.toAsset, ref: String(c.orderId) });
+  }
+  if (div.ok && Array.isArray(div.v.rows)) for (const d of div.v.rows) {
+    timeline.push({ type: 'DIVIDEN', time: Number(d.divTime), amount: d.amount, asset: d.asset, ref: String(d.tranId) });
+  }
+  timeline.sort((a, b) => b.time - a.time);
+
+  res.json({
+    ok: true,
+    daysBack: lookbackDays,
+    accountType: bal.ok ? bal.v.accountType : null,
+    balances,
+    timeline,
+    sources: {
+      balance: bal.ok, pay: pay.ok, deposit: dep.ok,
+      withdraw: wd.ok, convert: conv.ok, dividen: div.ok,
+    },
+    errors: {
+      balance: bal.ok ? null : bal.e, pay: pay.ok ? null : pay.e,
+      deposit: dep.ok ? null : dep.e, withdraw: wd.ok ? null : wd.e,
+      convert: conv.ok ? null : conv.e, dividen: div.ok ? null : div.e,
+    },
+  });
+});
+
 module.exports = router;

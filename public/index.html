@@ -137,6 +137,7 @@
       <button class="btn btn-outline" onclick="debugDeposit()">Cek Deposit History</button>
       <button class="btn btn-outline" onclick="debugWithdraw()">Cek Withdraw History</button>
       <button class="btn btn-outline" onclick="debugBalances()">Cek Saldo</button>
+      <button class="btn btn-green" onclick="debugOverview()">Lihat Semua (Overview)</button>
     </div>
     <div id="debugResult"></div>
   </div>
@@ -241,6 +242,20 @@ async function debugPayFull(){
     :data.transactions.map(t=>'<div class="inv-row"><span class="inv-label">'+new Date(Number(t.transactionTime)).toLocaleString('id-ID')+'</span><span class="inv-value">'+(Number(t.amount)>0?'+':'')+t.amount+' '+t.currency+' &nbsp; <span style="color:#555;font-size:11px">'+t.transactionId+'</span></span></div>').join('');
   const warn=data.truncated?' <span style="color:#eab308">(terpotong, ada lebih banyak)</span>':'';
   el.innerHTML='<div class="alert alert-success">'+data.count+' transaksi Pay dalam '+data.daysBack+' hari ('+data.apiCalls+' API call)'+warn+'</div><div class="invoice-card">'+rows+'</div>';
+}
+async function debugOverview(){
+  const el=document.getElementById('debugResult');
+  el.innerHTML='<div class="alert alert-info"><span class="spinner"></span>Mengambil semua isi akun (10-20 detik)...</div>';
+  const {ok,data}=await req('/debug/overview',{method:'POST',body:JSON.stringify({days:30})});
+  if(!ok){el.innerHTML='<div class="alert alert-error">'+(data.error||'Error')+'</div>';return;}
+  const ic={PAY:'#f0b90b',DEPOSIT:'#22c55e',WITHDRAW:'#ef4444',CONVERT:'#60a5fa',DIVIDEN:'#a78bfa'};
+  const balHtml=data.balances.length===0?'<div class="empty-state">Tidak ada saldo</div>':data.balances.map(b=>'<div class="inv-row"><span class="inv-label">'+b.asset+'</span><span class="inv-value">'+b.free+(parseFloat(b.locked)>0?' (locked: '+b.locked+')':'')+'</span></div>').join('');
+  const tlHtml=data.timeline.length===0?'<div class="empty-state">Tidak ada aktivitas dalam '+data.daysBack+' hari</div>':data.timeline.map(t=>'<div class="inv-row"><span class="inv-label"><span style="color:'+(ic[t.type]||'#888')+';font-weight:600">'+t.type+'</span> &nbsp; '+new Date(t.time).toLocaleString('id-ID')+(t.network?' &nbsp; '+t.network:'')+'</span><span class="inv-value">'+t.amount+' '+t.asset+'</span></div>').join('');
+  const failed=Object.entries(data.sources).filter(([k,v])=>!v).map(([k])=>k);
+  const warn=failed.length?'<div class="alert alert-error">Gagal ambil: '+failed.join(', ')+'</div>':'';
+  el.innerHTML='<div class="alert alert-success">Akun '+(data.accountType||'')+' — '+data.balances.length+' aset, '+data.timeline.length+' aktivitas ('+data.daysBack+' hari)</div>'+warn+
+    '<div class="method-label" style="margin:12px 0 4px;color:#f0b90b">SALDO</div><div class="invoice-card">'+balHtml+'</div>'+
+    '<div class="method-label" style="margin:12px 0 4px;color:#f0b90b">TIMELINE AKTIVITAS</div><div class="invoice-card">'+tlHtml+'</div>';
 }
 async function debugDeposit(){
   const el=document.getElementById('debugResult');
