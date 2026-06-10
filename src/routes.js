@@ -307,4 +307,44 @@ router.post('/debug/deposit-history', async (req, res) => {
   }
 });
 
+// ----------------------------------------------------------------
+// POST /api/debug/withdraw-history — cek riwayat withdraw (keluar)
+// ----------------------------------------------------------------
+router.post('/debug/withdraw-history', async (req, res) => {
+  const cfg = config.fromRequest(req);
+  if (!cfg.apiKey || !cfg.apiSecret) {
+    return res.status(400).json({ error: 'API Key dan Secret belum diisi' });
+  }
+  try {
+    const { hours = 24, coin } = req.body || {};
+    const startTime = Date.now() - Math.min(Number(hours) || 24, 168) * 60 * 60 * 1000;
+    const json = await client.signedGet('/sapi/v1/capital/withdraw/history', {
+      startTime, endTime: Date.now(), coin: coin || undefined, limit: 100,
+    }, cfg);
+    const list = Array.isArray(json) ? json : [];
+    res.json({ ok: true, count: list.length, hoursBack: Math.min(Number(hours) || 24, 168), withdrawals: list });
+  } catch (err) {
+    res.status(502).json({ ok: false, error: err.message, code: err.code });
+  }
+});
+
+// ----------------------------------------------------------------
+// POST /api/debug/balances — cek saldo spot (yang > 0)
+// ----------------------------------------------------------------
+router.post('/debug/balances', async (req, res) => {
+  const cfg = config.fromRequest(req);
+  if (!cfg.apiKey || !cfg.apiSecret) {
+    return res.status(400).json({ error: 'API Key dan Secret belum diisi' });
+  }
+  try {
+    const json = await client.signedGet('/api/v3/account', {}, cfg);
+    const balances = (json.balances || [])
+      .filter((b) => parseFloat(b.free) > 0 || parseFloat(b.locked) > 0)
+      .map((b) => ({ asset: b.asset, free: b.free, locked: b.locked }));
+    res.json({ ok: true, count: balances.length, accountType: json.accountType, balances });
+  } catch (err) {
+    res.status(502).json({ ok: false, error: err.message, code: err.code });
+  }
+});
+
 module.exports = router;

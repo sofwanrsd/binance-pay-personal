@@ -134,6 +134,8 @@
     <div class="btn-row">
       <button class="btn btn-yellow" onclick="debugPay()">Cek Pay History</button>
       <button class="btn btn-outline" onclick="debugDeposit()">Cek Deposit History</button>
+      <button class="btn btn-outline" onclick="debugWithdraw()">Cek Withdraw History</button>
+      <button class="btn btn-outline" onclick="debugBalances()">Cek Saldo</button>
     </div>
     <div id="debugResult"></div>
   </div>
@@ -238,7 +240,29 @@ async function debugDeposit(){
   const rows=data.deposits.length===0
     ?'<div class="empty-state">Tidak ada deposit dalam '+data.hoursBack+' jam terakhir'+(coin?' ('+coin+')':'')+'</div>'
     :data.deposits.map(d=>'<div class="inv-row"><span class="inv-label">'+new Date(Number(d.insertTime)).toLocaleString('id-ID')+' &nbsp; '+d.network+'</span><span class="inv-value">+'+d.amount+' '+d.coin+' &nbsp; <span style="color:#555;font-size:11px">'+d.id+'</span></span></div>').join('');
-  el.innerHTML='<div class="alert alert-success">Koneksi OK — '+data.count+' deposit dalam '+data.hoursBack+' jam terakhir</div><div class="invoice-card">'+rows+'</div>';
+   el.innerHTML='<div class="alert alert-success">Koneksi OK — '+data.count+' deposit dalam '+data.hoursBack+' jam terakhir</div><div class="invoice-card">'+rows+'</div>';
+}
+async function debugWithdraw(){
+  const el=document.getElementById('debugResult');
+  const hours=document.getElementById('debugHours').value||24;
+  const coin=document.getElementById('debugCoin').value.trim();
+  el.innerHTML='<div class="alert alert-info"><span class="spinner"></span>Mengambil Withdraw History...</div>';
+  const {ok,data}=await req('/debug/withdraw-history',{method:'POST',body:JSON.stringify({hours:Number(hours),coin:coin||undefined})});
+  if(!ok){el.innerHTML='<div class="alert alert-error">'+(data.error||'Error')+' '+(data.code?'(code: '+data.code+')':'')+'</div>';return;}
+  const rows=data.withdrawals.length===0
+    ?'<div class="empty-state">Tidak ada withdraw dalam '+data.hoursBack+' jam terakhir'+(coin?' ('+coin+')':'')+'</div>'
+    :data.withdrawals.map(w=>'<div class="inv-row"><span class="inv-label">'+(w.applyTime||'')+' &nbsp; '+(w.network||'')+'</span><span class="inv-value">-'+w.amount+' '+w.coin+' &nbsp; <span style="color:#555;font-size:11px">'+(w.id||'')+'</span></span></div>').join('');
+  el.innerHTML='<div class="alert alert-success">Koneksi OK — '+data.count+' withdraw dalam '+data.hoursBack+' jam terakhir</div><div class="invoice-card">'+rows+'</div>';
+}
+async function debugBalances(){
+  const el=document.getElementById('debugResult');
+  el.innerHTML='<div class="alert alert-info"><span class="spinner"></span>Mengambil saldo akun...</div>';
+  const {ok,data}=await req('/debug/balances',{method:'POST',body:JSON.stringify({})});
+  if(!ok){el.innerHTML='<div class="alert alert-error">'+(data.error||'Error')+' '+(data.code?'(code: '+data.code+')':'')+'</div>';return;}
+  const rows=data.balances.length===0
+    ?'<div class="empty-state">Tidak ada saldo > 0</div>'
+    :data.balances.map(b=>'<div class="inv-row"><span class="inv-label">'+b.asset+'</span><span class="inv-value">'+b.free+(parseFloat(b.locked)>0?' (locked: '+b.locked+')':'')+'</span></div>').join('');
+  el.innerHTML='<div class="alert alert-success">Koneksi OK — '+data.count+' aset ('+(data.accountType||'')+')</div><div class="invoice-card">'+rows+'</div>';
 }
 window.addEventListener('DOMContentLoaded',()=>{
   const c=getCreds();
