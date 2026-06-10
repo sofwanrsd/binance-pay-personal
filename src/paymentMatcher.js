@@ -26,14 +26,14 @@ function isIncome(tx) {
  * Cek apakah satu transaksi memenuhi syarat untuk sebuah invoice.
  * @returns {{ ok: boolean, reason?: string }}
  */
-function verifyMatch(invoice, tx) {
+async function verifyMatch(invoice, tx) {
   if (!invoice || !tx) return { ok: false, reason: 'data kurang' };
 
   const txId = String(tx.transactionId || '');
   if (!txId) return { ok: false, reason: 'transaksi tanpa id' };
 
   // 1) Anti-replay: transaksi sudah pernah dipakai invoice lain
-  if (store.isTransactionUsed(txId)) {
+  if (await store.isTransactionUsed(txId)) {
     return { ok: false, reason: 'transaksi sudah pernah dipakai' };
   }
 
@@ -77,15 +77,15 @@ function verifyMatch(invoice, tx) {
  * Melakukan dedupe (markTransactionUsed) secara atomik-ish (single thread).
  * @returns {object|null} invoice terupdate, atau null kalau gagal/keduluan.
  */
-function settleInvoice(invoice, tx) {
+async function settleInvoice(invoice, tx) {
   const txId = String(tx.transactionId);
 
   // Cek ulang tepat sebelum commit (hindari race di event loop)
-  if (store.isTransactionUsed(txId)) return null;
-  const current = store.get(invoice.id);
+  if (await store.isTransactionUsed(txId)) return null;
+  const current = await store.get(invoice.id);
   if (!current || current.status !== 'PENDING') return null;
 
-  store.markTransactionUsed(txId);
+  await store.markTransactionUsed(txId);
   return store.update(invoice.id, {
     status: 'PAID',
     transactionId: txId,
@@ -97,14 +97,14 @@ function settleInvoice(invoice, tx) {
 
 /**
  * Cari invoice PENDING yang cocok untuk sebuah transaksi (dipakai poller).
- * @returns {object|null} invoice yang cocok.
+ * @returns {Promise<object|null>} invoice yang cocok.
  */
-function findMatchingInvoice(tx) {
-  const candidates = store.pending();
+async function findMatchingInvoice(tx) {
+  const candidates = await store.pending();
   // Urutkan dari yang terbaru biar deterministik kalau ada beberapa cocok
   candidates.sort((a, b) => b.createdAt - a.createdAt);
   for (const inv of candidates) {
-    if (verifyMatch(inv, tx).ok) return inv;
+    if ((await verifyMatch(inv, tx)).ok) return inv;
   }
   return null;
 }
@@ -124,14 +124,14 @@ function findMatchingInvoice(tx) {
  * @param {string} normalizedNetwork - hasil normalizeNetwork(deposit.network)
  * @returns {{ ok: boolean, reason?: string }}
  */
-function verifyDepositMatch(invoice, deposit, normalizedNetwork) {
+async function verifyDepositMatch(invoice, deposit, normalizedNetwork) {
   if (!invoice || !deposit) return { ok: false, reason: 'data kurang' };
 
   const txId = String(deposit.id || '');
   if (!txId) return { ok: false, reason: 'deposit tanpa id' };
 
   // 1) Anti-replay
-  if (store.isTransactionUsed(txId)) {
+  if (await store.isTransactionUsed(txId)) {
     return { ok: false, reason: 'deposit sudah pernah dipakai' };
   }
 
@@ -173,14 +173,14 @@ function verifyDepositMatch(invoice, deposit, normalizedNetwork) {
  * Settle invoice dari deposit on-chain yang sudah terverifikasi.
  * @returns {object|null}
  */
-function settleInvoiceFromDeposit(invoice, deposit, normalizedNetwork) {
+async function settleInvoiceFromDeposit(invoice, deposit, normalizedNetwork) {
   const txId = String(deposit.id);
 
-  if (store.isTransactionUsed(txId)) return null;
-  const current = store.get(invoice.id);
+  if (await store.isTransactionUsed(txId)) return null;
+  const current = await store.get(invoice.id);
   if (!current || current.status !== 'PENDING') return null;
 
-  store.markTransactionUsed(txId);
+  await store.markTransactionUsed(txId);
   return store.update(invoice.id, {
     status: 'PAID',
     transactionId: txId,
@@ -195,13 +195,13 @@ function settleInvoiceFromDeposit(invoice, deposit, normalizedNetwork) {
 
 /**
  * Cari invoice PENDING yang cocok untuk sebuah deposit (dipakai poller).
- * @returns {object|null}
+ * @returns {Promise<object|null>}
  */
-function findMatchingInvoiceForDeposit(deposit, normalizedNetwork) {
-  const candidates = store.pending();
+async function findMatchingInvoiceForDeposit(deposit, normalizedNetwork) {
+  const candidates = await store.pending();
   candidates.sort((a, b) => b.createdAt - a.createdAt);
   for (const inv of candidates) {
-    if (verifyDepositMatch(inv, deposit, normalizedNetwork).ok) return inv;
+    if ((await verifyDepositMatch(inv, deposit, normalizedNetwork)).ok) return inv;
   }
   return null;
 }

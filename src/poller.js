@@ -24,9 +24,9 @@ async function tick() {
   if (running) return; // hindari overlap kalau request sebelumnya lambat
   running = true;
   try {
-    expireOverdue();
+    await expireOverdue();
 
-    const pending = store.pending();
+    const pending = await store.pending();
     if (pending.length === 0) return; // tidak perlu hit API kalau tidak ada yang nunggu
 
     const lookbackMs = (config.invoiceExpiryMinutes + config.matchGraceMinutes + 60) * 60 * 1000;
@@ -45,12 +45,12 @@ async function tick() {
     if (payResult.status === 'fulfilled') {
       for (const tx of payResult.value) {
         if (!matcher.isIncome(tx)) continue;
-        if (store.isTransactionUsed(String(tx.transactionId))) continue;
+        if (await store.isTransactionUsed(String(tx.transactionId))) continue;
 
-        const invoice = matcher.findMatchingInvoice(tx);
+        const invoice = await matcher.findMatchingInvoice(tx);
         if (!invoice) continue;
 
-        const settled = matcher.settleInvoice(invoice, tx);
+        const settled = await matcher.settleInvoice(invoice, tx);
         if (settled) {
           console.log(
             `[poller/pay] invoice ${settled.id} -> PAID ` +
@@ -77,10 +77,10 @@ async function tick() {
         // Skip kalau network tidak ada di acceptedNetworks
         if (!config.acceptedNetworks.includes(normalizedNetwork)) continue;
 
-        const invoice = matcher.findMatchingInvoiceForDeposit(deposit, normalizedNetwork);
+        const invoice = await matcher.findMatchingInvoiceForDeposit(deposit, normalizedNetwork);
         if (!invoice) continue;
 
-        const settled = matcher.settleInvoiceFromDeposit(invoice, deposit, normalizedNetwork);
+        const settled = await matcher.settleInvoiceFromDeposit(invoice, deposit, normalizedNetwork);
         if (settled) {
           console.log(
             `[poller/onchain] invoice ${settled.id} -> PAID ` +
@@ -103,11 +103,12 @@ async function tick() {
 }
 
 /** Tandai invoice PENDING yang sudah lewat expiry jadi EXPIRED. */
-function expireOverdue() {
+async function expireOverdue() {
   const now = Date.now();
-  for (const inv of store.all()) {
+  const list = await store.all();
+  for (const inv of list) {
     if (inv.status === 'PENDING' && inv.expiresAt <= now) {
-      store.update(inv.id, { status: 'EXPIRED' });
+      await store.update(inv.id, { status: 'EXPIRED' });
       console.log(`[poller] invoice ${inv.id} -> EXPIRED`);
     }
   }

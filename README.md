@@ -1,192 +1,185 @@
-# Binance Pay Gateway — Akun Personal
+# Binance Pay Gateway — Personal
 
-Backend payment gateway yang menggunakan akun Binance **personal** (bukan merchant) sebagai penerima pembayaran. Tidak butuh verifikasi bisnis, cukup akun Binance biasa dengan API key Read-only.
+Penyedia API untuk cek pembayaran & aktivitas akun Binance **personal** (bukan merchant). Web sebagai API provider — **tidak menyimpan credentials sama sekali**. Cocok dihubungkan ke web, bot, atau sistem lain.
 
-## Cara Kerja
+Mendukung dua metode pembayaran:
+- **Binance Pay** (transfer via Pay ID)
+- **On-chain deposit** (USDT TRC20, BEP20, dll)
+
+## Arsitektur
 
 ```
-Buyer                   Server kamu              Binance API
-  |                          |                        |
-  |-- POST /api/invoices --> |                        |
-  |                          |-- buat invoice lokal   |
-  |<-- invoiceId + payId --- |                        |
-  |                          |                        |
-  |-- bayar via Binance Pay->|                        |
-  |   ke Pay ID kamu         |                        |
-  |                          |                        |
-  |-- POST /api/invoices     |                        |
-  |   /:id/claim + txId ---> |                        |
-  |                          |-- GET /sapi/v1/pay --> |
-  |                          |   /transactions        |
-  |                          |<-- list transaksi ----- |
-  |                          |-- verifikasi match      |
-  |<-- status PAID ----------|                        |
+ui/          Frontend React + Vite (dashboard, tutorial, API docs)
+api/         Serverless entry point (Express, untuk Vercel + dev lokal)
+src/         Logic backend
+  config.js            Baca credentials per-request dari header
+  routes.js            Semua endpoint API
+  binanceSpotClient.js Client Binance Spot API (signed requests)
+  paymentMatcher.js    Verifikasi & matching pembayaran (async)
+  orderStore.js        Storage: KV (Vercel) atau in-memory (lokal)
+  kvClient.js          Wrapper Upstash/Vercel KV
+  poller.js            Background poller (dev lokal only)
+  rateLimit.js         Rate limiter per IP
+  fulfillment.js       Hook setelah pembayaran berhasil
+test/        Unit test (node:test)
 ```
 
-Selain klaim manual, ada **poller** yang berjalan di background setiap `POLL_INTERVAL_SECONDS` detik untuk mencocokkan transaksi masuk secara otomatis tanpa buyer perlu kirim TxId.
+## Keamanan Credentials
 
-## Prasyarat
+Server **tidak pernah menyimpan** API Key/Secret/Pay ID. Setiap request wajib membawa header sendiri:
 
-- Node.js >= 18
-- Akun Binance (personal, tidak perlu verifikasi bisnis)
-- API Key Binance dengan permission **Enable Reading** saja
+```
+X-Binance-Api-Key: <api key>
+X-Binance-Api-Secret: <api secret>
+X-Binance-Pay-Id: <pay id>      (opsional, untuk fitur Binance Pay)
+```
 
-## Setup
+Server pakai sekali untuk memanggil Binance, lalu dibuang. Di UI, credentials disimpan di `localStorage` browser (tidak pernah ke server). Gunakan API Key **Read-only**.
 
-**1. Clone / download project lalu install dependencies**
+## Setup Lokal
+
+Butuh Node.js >= 18.
 
 ```bash
 npm install
 ```
 
-**2. Buat API Key di Binance**
-
-Binance > Settings > API Management > Create API
-- Centang **Enable Reading** saja
-- Restrict access to trusted IPs (opsional tapi disarankan)
-- Salin API Key dan Secret Key
-
-**3. Cari Pay ID kamu**
-
-Binance app > Pay > ikon profil/QR pojok kanan atas > Pay ID (angka 9 digit)
-
-**4. Buat file `.env`**
+Jalankan dua proses (dua terminal):
 
 ```bash
-cp .env.example .env
+npm run server   # backend Express di port 3000
+npm run dev      # frontend Vite di port 5173 (proxy /api ke 3000)
 ```
 
-Isi minimal:
+Buka http://localhost:5173
 
-```env
-BINANCE_API_KEY=isi_api_key_kamu
-BINANCE_API_SECRET=isi_api_secret_kamu
-BINANCE_PAY_ID=123456789
-```
-
-**5. Jalankan server**
+## Build Produksi
 
 ```bash
-# Production
-npm start
-
-# Development (auto-restart saat file berubah)
-npm run dev
+npm run build    # output ke dist/
+npm start        # jalankan backend Express
 ```
 
-## API Endpoints
+## Deploy ke Vercel
 
-### Buat Invoice Baru
+1. Import repo ke Vercel
+2. Framework preset: otomatis (`@vercel/static-build` jalankan `npm run build`)
+3. Region sudah di-set `sin1` (Singapura) untuk menghindari geoblock Binance
+4. Deploy
 
-```
-POST /api/invoices
-Content-Type: application/json
+**Penting:** untuk mode API provider publik, **jangan** isi env `BINANCE_API_KEY`/`BINANCE_API_SECRET` di Vercel — biarkan kosong supaya tiap pemanggil pakai akun sendiri.
 
-{
-  "amount": 5.00,
-  "currency": "USDT",
-  "productId": "PROD-001",
-  "buyer": "username_buyer"
-}
-```
+### Storage Persisten (opsional tapi disarankan)
 
-Response:
-
-```json
-{
-  "invoiceId": "INV1A2B3C4D5E6F",
-  "status": "PENDING",
-  "currency": "USDT",
-  "amountToPay": 5.0037,
-  "payId": "123456789",
-  "expiresAt": 1749563004639,
-  "instruction": "Bayar TEPAT 5.0037 USDT via Binance Pay ke Pay ID 123456789 ..."
-}
-```
-
-> `amountToPay` sengaja diberi desimal unik kecil agar matching otomatis lebih akurat.
-
-### Cek Status Invoice
+Filesystem Vercel ephemeral, jadi invoice tidak bertahan tanpa KV. Untuk invoice produktif, tambahkan Upstash Redis / Vercel KV lalu set env:
 
 ```
-GET /api/invoices/:invoiceId
+KV_REST_API_URL=https://xxx.upstash.io
+KV_REST_API_TOKEN=xxxxx
 ```
 
-### Klaim Pembayaran (Verifikasi Cepat)
+Tanpa env ini, sistem otomatis fallback ke in-memory (cukup untuk dev/checking, tidak persisten).
 
-Buyer kirim Transaction ID setelah bayar untuk verifikasi instan tanpa nunggu poller:
+## Endpoint API
 
+Base URL: `/api`
+
+### Invoice (Payment Gateway)
+
+| Method | Path | Fungsi |
+|--------|------|--------|
+| POST | `/invoices` | Buat invoice baru |
+| GET | `/invoices` | Daftar semua invoice |
+| GET | `/invoices/:id` | Detail invoice |
+| POST | `/invoices/:id/check` | Cek pembayaran on-demand |
+| POST | `/invoices/:id/claim` | Klaim cepat via Transaction ID |
+
+### Debug / Checking Akun (stateless)
+
+| Method | Path | Fungsi |
+|--------|------|--------|
+| POST | `/debug/pay-history` | Riwayat Binance Pay (mode cepat / full 90 hari) |
+| POST | `/debug/deposit-history` | Riwayat deposit on-chain |
+| POST | `/debug/withdraw-history` | Riwayat withdraw on-chain |
+| POST | `/debug/balances` | Saldo spot |
+| POST | `/debug/overview` | Saldo + timeline gabungan semua aktivitas |
+
+Dokumentasi interaktif lengkap (dengan try-out) tersedia di halaman `/docs`.
+
+## Contoh Pemakaian
+
+### Cek akun (cURL)
+
+```bash
+curl -X POST https://your-app.vercel.app/api/debug/overview \
+  -H "Content-Type: application/json" \
+  -H "X-Binance-Api-Key: API_KEY" \
+  -H "X-Binance-Api-Secret: API_SECRET" \
+  -d '{ "days": 7 }'
 ```
-POST /api/invoices/:invoiceId/claim
-Content-Type: application/json
 
-{
-  "transactionId": "320***********"
-}
-```
-
-Transaction ID bisa dilihat buyer di: Binance app > Pay > riwayat transaksi > detail
-
-### Daftar Semua Invoice
-
-```
-GET /api/invoices
-```
-
-> Lindungi endpoint ini dengan autentikasi sebelum deploy ke produksi.
-
-### Health Check
-
-```
-GET /health
-```
-
-## Status Invoice
-
-| Status | Keterangan |
-|--------|-----------|
-| `PENDING` | Menunggu pembayaran |
-| `PAID` | Pembayaran terverifikasi |
-| `EXPIRED` | Lewat batas waktu sebelum dibayar |
-
-## Fulfillment
-
-Edit `src/fulfillment.js` untuk menambahkan aksi setelah pembayaran berhasil (kirim barang, aktivasi akun, kirim email, dll):
+### Alur invoice (JavaScript)
 
 ```js
-// src/fulfillment.js
-async function fulfillOrder(invoice) {
-  // Contoh: kirim email konfirmasi
-  await sendEmail(invoice.buyer, invoice.productId);
+const headers = {
+  'Content-Type': 'application/json',
+  'X-Binance-Api-Key': KEY,
+  'X-Binance-Api-Secret': SECRET,
+  'X-Binance-Pay-Id': PAY_ID,
+};
 
-  // Contoh: aktivasi lisensi
-  await activateLicense(invoice.productId, invoice.buyer);
+// 1. Buat invoice
+const inv = await fetch(BASE + '/api/invoices', {
+  method: 'POST', headers,
+  body: JSON.stringify({ amount: 5, currency: 'USDT' }),
+}).then((r) => r.json());
 
-  store.update(invoice.id, { fulfilled: true, fulfilledAt: Date.now() });
+// 2. Poll status sampai PAID
+const status = await fetch(BASE + '/api/invoices/' + inv.invoiceId + '/check', {
+  method: 'POST', headers,
+}).then((r) => r.json());
+
+if (status.status === 'PAID') {
+  // kirim barang / aktivasi
 }
 ```
 
-## Struktur File
+## Cara Kerja Matching
 
+Pembayaran diverifikasi dari **history akun sendiri** (bukan klaim buyer). Aturan di `paymentMatcher.js`:
+
+- Hanya transaksi **masuk** (income) yang dihitung
+- Nominal cocok dalam toleransi (default ±0.5%)
+- Mata uang / coin & network sesuai
+- Waktu dalam window invoice + grace period
+- Anti-replay: satu transaksi tidak bisa dipakai dua invoice
+
+Tiap invoice diberi desimal unik kecil pada nominal supaya matching otomatis akurat.
+
+## Testing
+
+```bash
+npm test         # atau: node --test
 ```
-src/
-  server.js           # Entry point Express
-  config.js           # Konfigurasi dari .env
-  routes.js           # API endpoints
-  binanceSpotClient.js # Client Binance Spot API (signed requests)
-  orderStore.js       # Penyimpanan invoice (file JSON, persistent)
-  paymentMatcher.js   # Logika verifikasi & matching transaksi
-  poller.js           # Background poller cek transaksi otomatis
-  fulfillment.js      # Aksi setelah pembayaran berhasil
-data/
-  invoices.json       # Data invoice (dibuat otomatis)
-.env.example          # Template konfigurasi
-```
 
-## Catatan Keamanan
+Unit test mencakup logika matching: income/keluar, toleransi nominal, window waktu, dedupe anti-replay, dan matching deposit on-chain.
 
-- API Key hanya butuh **Read** permission — jangan aktifkan trading/withdraw
-- Data invoice disimpan di `data/invoices.json` — backup file ini secara berkala
-- Endpoint `GET /api/invoices` sebaiknya dilindungi API key/auth di produksi
-- Untuk produksi dengan traffic tinggi, ganti `orderStore.js` ke database (Postgres/MySQL/Redis)
-- Rate limit Binance: poller default 20 detik, jangan di-set di bawah 10 detik
+## Konfigurasi (Environment)
+
+| Env | Default | Keterangan |
+|-----|---------|-----------|
+| `ACCEPTED_CURRENCIES` | `USDT` | Mata uang diterima (pisah koma) |
+| `ACCEPTED_NETWORKS` | `TRC20` | Jaringan on-chain diterima |
+| `INVOICE_EXPIRY_MINUTES` | `30` | Masa berlaku invoice |
+| `AMOUNT_TOLERANCE_PERCENT` | `0.5` | Toleransi selisih nominal |
+| `POLL_INTERVAL_SECONDS` | `20` | Interval poller (dev lokal) |
+| `RATE_LIMIT_MAX` | `60` | Max request per IP per window |
+| `RATE_LIMIT_WINDOW_MS` | `60000` | Window rate limit |
+| `KV_REST_API_URL` | - | Upstash/Vercel KV (opsional) |
+| `KV_REST_API_TOKEN` | - | Token KV (opsional) |
+
+## Catatan
+
+- API Key cukup permission **Enable Reading** — jangan aktifkan trading/withdraw
+- Poller background hanya jalan di dev lokal / VPS, bukan di Vercel (pakai `/check` on-demand)
+- Untuk lihat semua history > 7 hari, pakai mode `full` di `/debug/pay-history`

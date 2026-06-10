@@ -1,27 +1,28 @@
 'use strict';
 
 /**
- * Penyimpanan invoice dengan persistensi ke file JSON.
+ * Penyimpanan invoice dengan dua backend:
+ *  1. KV (Upstash/Vercel KV) — dipakai kalau env KV tersedia. Persisten di
+ *     serverless (Vercel) di mana filesystem ephemeral.
+ *  2. In-memory + file JSON — fallback untuk dev lokal / VPS.
  *
- * Tujuan: data tidak hilang saat server restart. Tetap simpel & tanpa
- * dependency tambahan. Untuk skala besar / banyak instance, GANTI ke
- * database (Postgres/MySQL/Redis) yang mendukung transaksi atomik.
- *
- * Penulisan dibuat atomic (tulis ke file temp lalu rename) supaya file
- * tidak korup kalau proses mati di tengah penulisan.
+ * SEMUA fungsi async supaya seragam antar backend.
  */
 
 const fs = require('fs');
 const path = require('path');
+const kv = require('./kvClient');
 
+const USE_KV = kv.isEnabled();
+const KEY_INV = (id) => `inv:${id}`;
+const KEY_INDEX = 'inv:index';        // set semua invoice id
+const KEY_TXSET = 'tx:used';          // set transactionId terpakai
+
+// ---- backend in-memory (fallback) ----
 const DATA_DIR = process.env.DATA_DIR || path.join(__dirname, '..', 'data');
 const DATA_FILE = path.join(DATA_DIR, 'invoices.json');
-
-/** @type {Map<string, object>} invoiceId -> invoice */
 const invoices = new Map();
-/** @type {Set<string>} transactionId yang sudah dipakai klaim (dedupe / anti-replay) */
 const usedTransactions = new Set();
-
 let dirty = false;
 let flushTimer = null;
 
@@ -29,27 +30,25 @@ function ensureDir() {
   if (!fs.existsSync(DATA_DIR)) fs.mkdirSync(DATA_DIR, { recursive: true });
 }
 
-function load() {
+function loadLocal() {
   try {
     if (!fs.existsSync(DATA_FILE)) return;
     const raw = fs.readFileSync(DATA_FILE, 'utf8');
     if (!raw.trim()) return;
     const parsed = JSON.parse(raw);
     if (Array.isArray(parsed.invoices)) {
-      for (const inv of parsed.invoices) {
-        if (inv && inv.id) invoices.set(inv.id, inv);
-      }
+      for (const inv of parsed.invoices) if (inv && inv.id) invoices.set(inv.id, inv);
     }
     if (Array.isArray(parsed.usedTransactions)) {
       for (const id of parsed.usedTransactions) usedTransactions.add(id);
     }
     console.log(`[store] load ${invoices.size} invoice dari ${DATA_FILE}`);
   } catch (e) {
-    console.error(`[store] gagal load ${DATA_FILE}: ${e.message}`);
+    console.error(`[store] gagal load: ${e.message}`);
   }
 }
 
-function persist() {
+function persistLocal() {
   try {
     ensureDir();
     const snapshot = {
@@ -69,72 +68,88 @@ function persist() {
 function scheduleFlush() {
   dirty = true;
   if (flushTimer) return;
-  flushTimer = setTimeout(() => {
-    flushTimer = null;
-    if (dirty) persist();
-  }, 200);
+  flushTimer = setTimeout(() => { flushTimer = null; if (dirty) persistLocal(); }, 200);
 }
 
-function save(invoice) {
+if (!USE_KV) loadLocal();
+else console.log('[store] mode KV (persisten) aktif');
+
+// ---- API publik (async) ----
+
+async function save(invoice) {
   const record = { ...invoice, updatedAt: Date.now() };
-  invoices.set(invoice.id, record);
-  scheduleFlush();
+  if (USE_KV) {
+    await kv.set(KEY_INV(record.id), record);
+    await kv.sadd(KEY_INDEX, record.id);
+  } else {
+    invoices.set(record.id, record);
+    scheduleFlush();
+  }
   return record;
 }
 
-function get(id) {
+async function get(id) {
+  if (USE_KV) return kv.get(KEY_INV(id));
   return invoices.get(id) || null;
 }
 
-function update(id, patch = {}) {
-  const existing = invoices.get(id);
+async function update(id, patch = {}) {
+  const existing = await get(id);
   if (!existing) return null;
   const updated = { ...existing, ...patch, updatedAt: Date.now() };
-  invoices.set(id, updated);
-  scheduleFlush();
+  if (USE_KV) {
+    await kv.set(KEY_INV(id), updated);
+  } else {
+    invoices.set(id, updated);
+    scheduleFlush();
+  }
   return updated;
 }
 
-function all() {
+async function all() {
+  if (USE_KV) {
+    const ids = await kv.smembers(KEY_INDEX);
+    const out = [];
+    for (const id of ids) {
+      const inv = await kv.get(KEY_INV(id));
+      if (inv) out.push(inv);
+    }
+    return out;
+  }
   return Array.from(invoices.values());
 }
 
-/** Semua invoice yang masih menunggu pembayaran (PENDING & belum expired). */
-function pending() {
+/** Invoice PENDING yang belum expired. */
+async function pending() {
   const now = Date.now();
-  return Array.from(invoices.values()).filter(
-    (inv) => inv.status === 'PENDING' && inv.expiresAt > now
-  );
+  const list = await all();
+  return list.filter((inv) => inv.status === 'PENDING' && inv.expiresAt > now);
 }
 
-// ---- Dedupe / anti-replay transaksi ----
-function isTransactionUsed(transactionId) {
+// ---- dedupe / anti-replay ----
+async function isTransactionUsed(transactionId) {
+  if (USE_KV) return kv.sismember(KEY_TXSET, String(transactionId));
   return usedTransactions.has(String(transactionId));
 }
 
-function markTransactionUsed(transactionId) {
-  usedTransactions.add(String(transactionId));
-  scheduleFlush();
-}
-
-/** Flush sinkron, dipanggil saat shutdown supaya data terakhir tersimpan. */
-function flushSync() {
-  if (flushTimer) {
-    clearTimeout(flushTimer);
-    flushTimer = null;
+async function markTransactionUsed(transactionId) {
+  if (USE_KV) {
+    await kv.sadd(KEY_TXSET, String(transactionId));
+  } else {
+    usedTransactions.add(String(transactionId));
+    scheduleFlush();
   }
-  if (dirty) persist();
 }
 
-load();
+/** Flush sinkron saat shutdown (hanya untuk backend lokal). */
+function flushSync() {
+  if (USE_KV) return;
+  if (flushTimer) { clearTimeout(flushTimer); flushTimer = null; }
+  if (dirty) persistLocal();
+}
 
 module.exports = {
-  save,
-  get,
-  update,
-  all,
-  pending,
-  isTransactionUsed,
-  markTransactionUsed,
-  flushSync,
+  save, get, update, all, pending,
+  isTransactionUsed, markTransactionUsed, flushSync,
+  usesKV: USE_KV,
 };

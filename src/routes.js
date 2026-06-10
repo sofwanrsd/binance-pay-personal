@@ -76,7 +76,7 @@ function buildPaymentOptions(invoice, cfg) {
 // ----------------------------------------------------------------
 // POST /api/invoices — buat invoice baru
 // ----------------------------------------------------------------
-router.post('/invoices', (req, res) => {
+router.post('/invoices', async (req, res) => {
   const cfg = config.fromRequest(req);
   const { amount, currency, network, productId, buyer } = req.body || {};
 
@@ -98,7 +98,7 @@ router.post('/invoices', (req, res) => {
 
   const now = Date.now();
   const expectedAmount = computeExpectedAmount(base, cfg);
-  const invoice = store.save({
+  const invoice = await store.save({
     id: genInvoiceId(),
     baseAmount: round8(base),
     expectedAmount,
@@ -125,15 +125,15 @@ router.post('/invoices', (req, res) => {
 // ----------------------------------------------------------------
 // GET /api/invoices — daftar semua invoice
 // ----------------------------------------------------------------
-router.get('/invoices', (req, res) => {
-  res.json(store.all());
+router.get('/invoices', async (req, res) => {
+  res.json(await store.all());
 });
 
 // ----------------------------------------------------------------
 // GET /api/invoices/:id — cek status invoice
 // ----------------------------------------------------------------
-router.get('/invoices/:id', (req, res) => {
-  const inv = store.get(req.params.id);
+router.get('/invoices/:id', async (req, res) => {
+  const inv = await store.get(req.params.id);
   if (!inv) return res.status(404).json({ error: 'invoice tidak ditemukan' });
   res.json(inv);
 });
@@ -144,7 +144,7 @@ router.get('/invoices/:id', (req, res) => {
 // ----------------------------------------------------------------
 router.post('/invoices/:id/check', async (req, res) => {
   const cfg = config.fromRequest(req);
-  const inv = store.get(req.params.id);
+  const inv = await store.get(req.params.id);
   if (!inv) return res.status(404).json({ error: 'invoice tidak ditemukan' });
 
   if (inv.status !== 'PENDING') {
@@ -152,7 +152,7 @@ router.post('/invoices/:id/check', async (req, res) => {
   }
 
   if (inv.expiresAt <= Date.now()) {
-    const expired = store.update(inv.id, { status: 'EXPIRED' });
+    const expired = await store.update(inv.id, { status: 'EXPIRED' });
     return res.json({ status: 'EXPIRED', invoice: expired });
   }
 
@@ -171,9 +171,9 @@ router.post('/invoices/:id/check', async (req, res) => {
   if (payResult.status === 'fulfilled') {
     for (const tx of payResult.value) {
       if (!matcher.isIncome(tx)) continue;
-      if (store.isTransactionUsed(String(tx.transactionId))) continue;
-      if (!matcher.verifyMatch(inv, tx).ok) continue;
-      const settled = matcher.settleInvoice(inv, tx);
+      if (await store.isTransactionUsed(String(tx.transactionId))) continue;
+      if (!(await matcher.verifyMatch(inv, tx)).ok) continue;
+      const settled = await matcher.settleInvoice(inv, tx);
       if (settled) {
         fulfillOrder(settled).catch((e) => console.error('[fulfillment]', e.message));
         return res.json({ status: 'PAID', invoice: settled });
@@ -185,11 +185,11 @@ router.post('/invoices/:id/check', async (req, res) => {
   if (depositResult.status === 'fulfilled') {
     for (const deposit of depositResult.value) {
       if (!deposit.id) continue;
-      if (store.isTransactionUsed(String(deposit.id))) continue;
+      if (await store.isTransactionUsed(String(deposit.id))) continue;
       const network = client.normalizeNetwork(deposit.network || '');
       if (!cfg.acceptedNetworks.includes(network)) continue;
-      if (!matcher.verifyDepositMatch(inv, deposit, network).ok) continue;
-      const settled = matcher.settleInvoiceFromDeposit(inv, deposit, network);
+      if (!(await matcher.verifyDepositMatch(inv, deposit, network)).ok) continue;
+      const settled = await matcher.settleInvoiceFromDeposit(inv, deposit, network);
       if (settled) {
         fulfillOrder(settled).catch((e) => console.error('[fulfillment]', e.message));
         return res.json({ status: 'PAID', invoice: settled });
@@ -197,7 +197,7 @@ router.post('/invoices/:id/check', async (req, res) => {
     }
   }
 
-  const current = store.get(inv.id);
+  const current = await store.get(inv.id);
   res.json({ status: current.status, invoice: current });
 });
 
@@ -206,7 +206,7 @@ router.post('/invoices/:id/check', async (req, res) => {
 // ----------------------------------------------------------------
 router.post('/invoices/:id/claim', async (req, res) => {
   const cfg = config.fromRequest(req);
-  const inv = store.get(req.params.id);
+  const inv = await store.get(req.params.id);
   if (!inv) return res.status(404).json({ error: 'invoice tidak ditemukan' });
 
   if (inv.status === 'PAID') return res.json({ status: 'PAID', invoice: inv });
@@ -214,18 +214,18 @@ router.post('/invoices/:id/claim', async (req, res) => {
     return res.status(409).json({ error: 'invoice berstatus ' + inv.status });
   }
   if (inv.expiresAt <= Date.now()) {
-    store.update(inv.id, { status: 'EXPIRED' });
+    await store.update(inv.id, { status: 'EXPIRED' });
     return res.status(409).json({ error: 'invoice sudah kedaluwarsa' });
   }
   if ((inv.claimAttempts || 0) >= cfg.maxClaimAttempts) {
     return res.status(429).json({ error: 'terlalu banyak percobaan klaim' });
   }
 
-  store.update(inv.id, { claimAttempts: (inv.claimAttempts || 0) + 1 });
+  await store.update(inv.id, { claimAttempts: (inv.claimAttempts || 0) + 1 });
 
   const txId = String((req.body && req.body.transactionId) || '').trim();
   if (!txId) return res.status(400).json({ error: 'transactionId wajib diisi' });
-  if (store.isTransactionUsed(txId)) {
+  if (await store.isTransactionUsed(txId)) {
     return res.status(409).json({ error: 'transactionId sudah pernah dipakai' });
   }
 
@@ -243,12 +243,12 @@ router.post('/invoices/:id/claim', async (req, res) => {
       return res.status(404).json({ error: 'transaksi tidak ditemukan di akun. Pastikan TxId benar.' });
     }
 
-    const check = matcher.verifyMatch(inv, tx);
+    const check = await matcher.verifyMatch(inv, tx);
     if (!check.ok) {
       return res.status(422).json({ error: 'verifikasi gagal: ' + check.reason });
     }
 
-    const settled = matcher.settleInvoice(inv, tx);
+    const settled = await matcher.settleInvoice(inv, tx);
     if (!settled) {
       return res.status(409).json({ error: 'gagal settle (mungkin sudah diproses)' });
     }
