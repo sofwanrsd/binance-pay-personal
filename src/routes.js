@@ -296,7 +296,7 @@ router.post('/debug/withdraw-history', async (req, res) => {
 });
 
 // ----------------------------------------------------------------
-// POST /api/debug/balances
+// POST /api/debug/balances — Cek saldo SPOT + FUNDING + ALL WALLETS
 // ----------------------------------------------------------------
 router.post('/debug/balances', async (req, res) => {
   const cfg = config.fromRequest(req);
@@ -304,11 +304,56 @@ router.post('/debug/balances', async (req, res) => {
     return res.status(400).json({ error: 'API Key dan Secret belum diisi' });
   }
   try {
-    const json = await client.signedGet('/api/v3/account', {}, cfg);
-    const balances = (json.balances || [])
-      .filter((b) => parseFloat(b.free) > 0 || parseFloat(b.locked) > 0)
-      .map((b) => ({ asset: b.asset, free: b.free, locked: b.locked }));
-    res.json({ ok: true, count: balances.length, accountType: json.accountType, balances });
+    const safe = (p) => p.then((v) => ({ ok: true, v })).catch((e) => ({ ok: false, e: e.message }));
+
+    const [spotRes, fundingRes, userAssetRes] = await Promise.all([
+      safe(client.signedGet('/api/v3/account', {}, cfg)),
+      safe(client.signedPost('/sapi/v1/asset/get-funding-asset', { needBtcVal: 'true' }, cfg)),
+      safe(client.signedPost('/sapi/v3/asset/getUserAsset', {}, cfg)),
+    ]);
+
+    const spotBalances = spotRes.ok
+      ? (spotRes.v.balances || [])
+          .filter((b) => parseFloat(b.free) > 0 || parseFloat(b.locked) > 0)
+          .map((b) => ({ asset: b.asset, free: b.free, locked: b.locked, wallet: 'SPOT' }))
+      : [];
+
+    const fundingBalances = (fundingRes.ok && Array.isArray(fundingRes.v))
+      ? fundingRes.v
+          .filter((b) => parseFloat(b.free) > 0 || parseFloat(b.freeze) > 0 || parseFloat(b.withdrawing) > 0)
+          .map((b) => ({ asset: b.asset, free: b.free, locked: String(parseFloat(b.freeze || 0) + parseFloat(b.withdrawing || 0)), wallet: 'FUNDING' }))
+      : [];
+
+    const userAssets = (userAssetRes.ok && Array.isArray(userAssetRes.v))
+      ? userAssetRes.v
+          .filter((b) => parseFloat(b.free) > 0 || parseFloat(b.locked) > 0 || parseFloat(b.freeze) > 0)
+          .map((b) => ({
+            asset: b.asset,
+            free: b.free,
+            locked: String(parseFloat(b.locked || 0) + parseFloat(b.freeze || 0)),
+            wallet: b.wallet || 'ALL',
+          }))
+      : [];
+
+    // Gabungkan balances jika userAssets ada, atau gabung Spot + Funding
+    const combined = userAssets.length > 0
+      ? userAssets
+      : [...spotBalances, ...fundingBalances];
+
+    res.json({
+      ok: true,
+      count: combined.length,
+      accountType: spotRes.ok ? spotRes.v.accountType : 'MULTI_WALLET',
+      balances: combined,
+      spotBalances,
+      fundingBalances,
+      userAssets,
+      sources: {
+        spot: spotRes.ok,
+        funding: fundingRes.ok,
+        userAsset: userAssetRes.ok,
+      },
+    });
   } catch (err) {
     res.status(502).json({ ok: false, error: err.message, code: err.code });
   }

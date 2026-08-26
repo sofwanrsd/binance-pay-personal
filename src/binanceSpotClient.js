@@ -220,4 +220,56 @@ async function getAllPayTransactions({ startTime, endTime, cfg, maxCalls = 60 } 
   return { transactions: all, calls, truncated };
 }
 
-module.exports = { getPayTransactions, getAllPayTransactions, getDepositHistory, normalizeNetwork, sign, signedGet };
+/**
+ * Panggil endpoint SIGNED via POST (untuk SAPI seperti get-funding-asset).
+ */
+async function signedPost(endpoint, params = {}, cfg) {
+  if (!cfg.apiKey || !cfg.apiSecret) {
+    throw new Error('API key / secret belum diisi');
+  }
+  const withTs = { ...params, timestamp: Date.now(), recvWindow: 60000 };
+  const qs = buildQuery(withTs);
+  const signature = sign(qs, cfg.apiSecret);
+  const url = `${cfg.baseUrl}${endpoint}?${qs}&signature=${signature}`;
+
+  return new Promise((resolve, reject) => {
+    const u = new URL(url);
+    const options = {
+      method: 'POST',
+      hostname: cfg.resolveIp || u.hostname,
+      port: u.port || 443,
+      path: `${u.pathname}${u.search}`,
+      headers: {
+        'X-MBX-APIKEY': cfg.apiKey,
+        'Content-Type': 'application/x-www-form-urlencoded',
+        Host: u.hostname,
+      },
+      servername: u.hostname,
+    };
+
+    const req = https.request(options, (res) => {
+      let body = '';
+      res.on('data', (c) => (body += c));
+      res.on('end', () => {
+        try {
+          const json = JSON.parse(body);
+          if (res.statusCode < 200 || res.statusCode >= 300) {
+            const msg = json.msg || json.message || `HTTP ${res.statusCode}`;
+            const err = new Error(`Binance API error: ${msg}`);
+            err.code = json.code;
+            reject(err);
+          } else {
+            resolve(json);
+          }
+        } catch (e) {
+          reject(new Error(`Binance response bukan JSON (HTTP ${res.statusCode}): ${body}`));
+        }
+      });
+    });
+    req.on('error', reject);
+    req.setTimeout(20000, () => req.destroy(new Error('request timeout')));
+    req.end();
+  });
+}
+
+module.exports = { getPayTransactions, getAllPayTransactions, getDepositHistory, normalizeNetwork, sign, signedGet, signedPost };

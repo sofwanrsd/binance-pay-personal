@@ -290,17 +290,24 @@ function DebugResult({ c, searchTerm, setSearchTerm }) {
     return (
       <div style={{ marginTop: 24 }}>
         <div className="alert alert-success">
-          Koneksi OK — Total {c.count} aset aktif ({c.accountType || 'SPOT'})
+          Koneksi OK — Total {c.count} aset aktif (Spot, Funding, All Wallets)
         </div>
         <div className="mon-list" style={{ marginTop: 14 }}>
           {(c.balances || []).length === 0 ? (
             <div className="empty-state">Saldo wallet kosong</div>
           ) : (
-            c.balances.map((b) => (
-              <div className="mon-row" key={b.asset}>
-                <span className="mon-left" style={{ fontSize: 14, fontWeight: 700, color: 'var(--text-primary)' }}>
-                  {b.asset}
-                </span>
+            c.balances.map((b, idx) => (
+              <div className="mon-row" key={b.asset + '-' + (b.wallet || idx)}>
+                <div className="mon-left">
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                    <span style={{ fontSize: 14, fontWeight: 700, color: 'var(--text-primary)' }}>{b.asset}</span>
+                    {b.wallet && (
+                      <span className="mon-type-pill" style={{ background: b.wallet === 'FUNDING' ? 'var(--binance-yellow)' : 'var(--bg-elevated)', color: b.wallet === 'FUNDING' ? '#0b0e11' : 'var(--text-primary)' }}>
+                        {b.wallet}
+                      </span>
+                    )}
+                  </div>
+                </div>
                 <span className="mon-right">
                   {b.free}
                   {parseFloat(b.locked) > 0 && (
