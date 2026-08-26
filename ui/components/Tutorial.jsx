@@ -1,14 +1,17 @@
-import React from 'react';
+import React, { useState } from 'react';
+import { copy } from '../clientApi.js';
+import { BookOpen, Copy, Shield, Key, Terminal, Code2, CheckCircle2 } from 'lucide-react';
 
 const BASE = typeof window !== 'undefined' ? window.location.origin : 'https://your-app.vercel.app';
 
-const curlExample = `curl -X POST ${BASE}/api/debug/overview \\
+const CODE_EXAMPLES = {
+  curl: `curl -X POST ${BASE}/api/debug/overview \\
   -H "Content-Type: application/json" \\
   -H "X-Binance-Api-Key: API_KEY_KAMU" \\
   -H "X-Binance-Api-Secret: API_SECRET_KAMU" \\
-  -d '{ "days": 7 }'`;
+  -d '{ "days": 7 }'`,
 
-const jsExample = `const res = await fetch("${BASE}/api/debug/overview", {
+  nodejs: `const res = await fetch("${BASE}/api/debug/overview", {
   method: "POST",
   headers: {
     "Content-Type": "application/json",
@@ -18,106 +21,137 @@ const jsExample = `const res = await fetch("${BASE}/api/debug/overview", {
   body: JSON.stringify({ days: 7 }),
 });
 const data = await res.json();
-console.log(data.balances, data.timeline);`;
+console.log(data.balances, data.timeline);`,
 
-const invoiceExample = `// 1. Buat invoice
-const inv = await fetch("${BASE}/api/invoices", {
-  method: "POST",
-  headers: {
+  python: `import requests
+
+url = "${BASE}/api/debug/overview"
+headers = {
     "Content-Type": "application/json",
-    "X-Binance-Api-Key": KEY,
-    "X-Binance-Api-Secret": SECRET,
-    "X-Binance-Pay-Id": PAY_ID,
-  },
-  body: JSON.stringify({ amount: 5, currency: "USDT" }),
-}).then(r => r.json());
-
-// 2. Cek status (poll tiap 15 detik)
-const status = await fetch(
-  "${BASE}/api/invoices/" + inv.invoiceId + "/check",
-  { method: "POST", headers: { /* sama spt di atas */ } }
-).then(r => r.json());
-
-if (status.status === "PAID") {
-  // kirim barang / aktivasi
-}`;
-
-function Step({ n, title, children }) {
-  return (
-    <div className="tut-step">
-      <div className="tut-num">{n}</div>
-      <div className="tut-step-body">
-        <div className="tut-step-title">{title}</div>
-        <div className="tut-step-content">{children}</div>
-      </div>
-    </div>
-  );
+    "X-Binance-Api-Key": "API_KEY_KAMU",
+    "X-Binance-Api-Secret": "API_SECRET_KAMU"
 }
+payload = {"days": 7}
 
-function Code({ children }) {
-  return <pre className="ep-pre" style={{ marginTop: 10 }}>{children}</pre>;
-}
+response = requests.post(url, json=payload, headers=headers)
+print(response.json())`,
+
+  php: `<?php
+$ch = curl_init("${BASE}/api/debug/overview");
+curl_setopt($ch, CURLOPT_HTTPHEADER, [
+    'Content-Type: application/json',
+    'X-Binance-Api-Key: API_KEY_KAMU',
+    'X-Binance-Api-Secret: API_SECRET_KAMU'
+]);
+curl_setopt($ch, CURLOPT_POST, 1);
+curl_setopt($ch, CURLOPT_POSTFIELDS, json_encode(['days' => 7]));
+curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+
+$response = curl_exec($ch);
+curl_close($ch);
+echo $response;`
+};
 
 export default function Tutorial() {
+  const [lang, setLang] = useState('curl');
+
   return (
     <>
       <div className="card">
-        <h2>Cara Kerja</h2>
-        <p style={{ color: 'var(--muted)', fontSize: 13, lineHeight: 1.65 }}>
-          Web ini adalah <strong style={{ color: 'var(--txt)' }}>penyedia API</strong> untuk
-          cek pembayaran dan aktivitas akun Binance. Server tidak menyimpan credentials —
-          setiap request membawa API Key sendiri lewat header, dipakai sekali, lalu dibuang.
-          Cocok dihubungkan ke web, bot, atau sistem lain.
+        <div className="card-title">
+          <h2>
+            <span className="title-icon"><BookOpen size={20} /></span>
+            <span>Panduan &amp; Tutorial Integrasi API</span>
+          </h2>
+        </div>
+        <p style={{ color: 'var(--text-secondary)', fontSize: 13.5, lineHeight: 1.65 }}>
+          Web ini merupakan <strong style={{ color: 'var(--text-primary)' }}>penyedia API gateway stateless</strong> untuk
+          pengecekan pembayaran masuk dan monitoring transaksi Binance. Server tidak menyimpan API Key &amp; Secret Anda —
+          setiap request membawa credentials sendiri via Header HTTP, diproses secara real-time ke Binance, lalu dibuang.
         </p>
       </div>
 
       <div className="card">
-        <h2>Setup Awal</h2>
-        <Step n="1" title="Buat API Key di Binance">
-          Buka Binance &rarr; Settings &rarr; API Management &rarr; Create API.
-          Centang <strong>Enable Reading</strong> saja. Jangan aktifkan Trading/Withdraw.
-        </Step>
-        <Step n="2" title="Ambil Pay ID (opsional)">
-          Untuk fitur invoice Binance Pay: buka app Binance &rarr; Pay &rarr; lihat Pay ID
-          (9 digit) di pojok kanan atas.
-        </Step>
-        <Step n="3" title="Masukkan di tab Pengaturan">
-          Buka Dashboard &rarr; tab Pengaturan &rarr; isi API Key, Secret, Pay ID &rarr; Simpan.
-          Tersimpan di browser kamu, bukan di server.
-        </Step>
+        <div className="card-title">
+          <h2>
+            <span className="title-icon"><Key size={18} /></span>
+            <span>Langkah Setup Binance API</span>
+          </h2>
+        </div>
+
+        <div className="tut-step">
+          <div className="tut-num">1</div>
+          <div>
+            <div className="tut-step-title">Buat API Key di Binance</div>
+            <div className="tut-step-content">
+              Buka aplikasi/web Binance &rarr; <strong>Settings / Security</strong> &rarr; <strong>API Management</strong> &rarr; <strong>Create API</strong>.
+              Centang opsi <strong>Enable Reading</strong> saja. Pastikan <u>TIDAK</u> mengaktifkan izin Trading atau Withdrawal!
+            </div>
+          </div>
+        </div>
+
+        <div className="tut-step">
+          <div className="tut-num">2</div>
+          <div>
+            <div className="tut-step-title">Ambil Binance Pay ID (Opsional)</div>
+            <div className="tut-step-content">
+              Untuk mengaktifkan fitur Binance Pay: Buka aplikasi Binance &rarr; <strong>Pay</strong> &rarr; Salin Pay ID (9 digit angka) di bagian profil Pay Anda.
+            </div>
+          </div>
+        </div>
+
+        <div className="tut-step">
+          <div className="tut-num">3</div>
+          <div>
+            <div className="tut-step-title">Simpan di Tab Pengaturan</div>
+            <div className="tut-step-content">
+              Buka Dashboard &rarr; tab <strong>Pengaturan API</strong> &rarr; Isikan API Key, Secret, dan Pay ID &rarr; Klik Simpan. Credentials tersimpan aman di browser Anda (localStorage).
+            </div>
+          </div>
+        </div>
       </div>
 
       <div className="card">
-        <h2>Cek Akun (cURL)</h2>
-        <p style={{ color: 'var(--muted)', fontSize: 13 }}>
-          Ambil saldo + timeline aktivitas 7 hari terakhir:
-        </p>
-        <Code>{curlExample}</Code>
+        <div className="card-title">
+          <h2>
+            <span className="title-icon"><Code2 size={18} /></span>
+            <span>Contoh Kode Integrasi</span>
+          </h2>
+
+          <div className="preset-pills">
+            <button className={`pill-btn ${lang === 'curl' ? 'active' : ''}`} onClick={() => setLang('curl')}>cURL</button>
+            <button className={`pill-btn ${lang === 'nodejs' ? 'active' : ''}`} onClick={() => setLang('nodejs')}>Node.js</button>
+            <button className={`pill-btn ${lang === 'python' ? 'active' : ''}`} onClick={() => setLang('python')}>Python</button>
+            <button className={`pill-btn ${lang === 'php' ? 'active' : ''}`} onClick={() => setLang('php')}>PHP</button>
+          </div>
+        </div>
+
+        <div style={{ position: 'relative' }}>
+          <pre className="ep-pre">{CODE_EXAMPLES[lang]}</pre>
+          <button
+            className="btn btn-outline btn-sm"
+            style={{ position: 'absolute', top: 12, right: 12 }}
+            onClick={() => copy(CODE_EXAMPLES[lang], `Kode ${lang.toUpperCase()}`)}
+          >
+            <Copy size={13} />
+            <span>Salin Kode</span>
+          </button>
+        </div>
       </div>
 
       <div className="card">
-        <h2>Integrasi JavaScript</h2>
-        <p style={{ color: 'var(--muted)', fontSize: 13 }}>
-          Panggil dari web/bot kamu sendiri:
-        </p>
-        <Code>{jsExample}</Code>
-      </div>
+        <div className="card-title">
+          <h2>
+            <span className="title-icon"><Shield size={18} /></span>
+            <span>Prinsip Keamanan Maksimal</span>
+          </h2>
+        </div>
 
-      <div className="card">
-        <h2>Alur Invoice (Payment Gateway)</h2>
-        <p style={{ color: 'var(--muted)', fontSize: 13 }}>
-          Buat invoice, lalu poll status sampai PAID:
-        </p>
-        <Code>{invoiceExample}</Code>
-      </div>
-
-      <div className="card">
-        <h2>Catatan Keamanan</h2>
-        <ul className="modal-list" style={{ marginTop: 0 }}>
-          <li>Selalu gunakan API Key <strong>Read-only</strong></li>
-          <li>Credentials dikirim via header, tidak pernah disimpan server</li>
-          <li>Simpan Secret kamu di environment variable, jangan hardcode</li>
-          <li>Restrict API Key ke IP tertentu di Binance bila memungkinkan</li>
+        <ul className="modal-list">
+          <li>Selalu gunakan API Key dengan hak akses <strong>Read-Only</strong>.</li>
+          <li>Credentials dikirim langsung melalui Request Header HTTP secara encrypted (HTTPS).</li>
+          <li>Jangan pernah membagikan Secret Key Anda kepada siapapun.</li>
+          <li>Jika memungkinkan, lakukan pembatasan IP (IP Whitelisting) pada Binance API Key Management.</li>
         </ul>
       </div>
     </>

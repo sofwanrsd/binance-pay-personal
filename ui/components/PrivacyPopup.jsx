@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { ShieldCheck, Check, Lock } from 'lucide-react';
 
 export default function PrivacyPopup() {
   const [open, setOpen] = useState(false);
@@ -18,26 +19,25 @@ export default function PrivacyPopup() {
     <div className="modal-overlay" onClick={accept}>
       <div className="modal" onClick={(e) => e.stopPropagation()}>
         <div className="modal-icon">
-          <svg width="28" height="28" viewBox="0 0 24 24" fill="none">
-            <path d="M12 2l8 4v6c0 5-3.4 8.5-8 10-4.6-1.5-8-5-8-10V6l8-4z"
-              stroke="#0a0c14" strokeWidth="2" strokeLinejoin="round" />
-            <path d="M9 12l2 2 4-4" stroke="#0a0c14" strokeWidth="2"
-              strokeLinecap="round" strokeLinejoin="round" />
-          </svg>
+          <ShieldCheck size={30} />
         </div>
-        <h3 className="modal-title">Privasi & Keamanan</h3>
+        <h3 className="modal-title">Privasi &amp; Keamanan Data</h3>
         <p className="modal-text">
-          Kami <strong>tidak menyimpan</strong> API Key, Secret Key, atau Pay ID kamu
-          di server. Sama sekali.
+          Aplikasi ini <strong style={{ color: 'var(--text-primary)' }}>stateless</strong> dan <strong>TIDAK menyimpan</strong> API Key, Secret Key, atau Pay ID Anda di server database.
         </p>
+
         <ul className="modal-list">
-          <li>Credentials hanya tersimpan di <strong>browser kamu</strong> (localStorage)</li>
-          <li>Saat request, dikirim langsung ke Binance via server kami tanpa disimpan</li>
-          <li>Server hanya jadi perantara — pakai sekali, lalu dibuang</li>
-          <li>Gunakan API Key <strong>Read-only</strong> untuk keamanan maksimal</li>
+          <li>Credentials hanya tersimpan secara lokal di <strong>browser Anda</strong> (localStorage).</li>
+          <li>Setiap request dikirim langsung ke Binance secara aman melalui perantara proxy HTTPS.</li>
+          <li>Server tidak mencatat atau menyimpan log credentials pengguna.</li>
+          <li>Selalu gunakan Binance API Key <strong>Read-only</strong> demi keamanan maksimal.</li>
         </ul>
-        <div className="modal-actions">
-          <button className="btn btn-primary" onClick={accept}>Saya mengerti</button>
+
+        <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: 20 }}>
+          <button className="btn btn-primary" onClick={accept}>
+            <Check size={16} />
+            <span>Saya Mengerti &amp; Lanjutkan</span>
+          </button>
         </div>
       </div>
     </div>

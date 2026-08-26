@@ -11,11 +11,9 @@ const app = express();
 
 app.use(express.json());
 
-// Serve static files dari public/ untuk dev lokal
-// (di Vercel, static files dihandle langsung oleh CDN)
-if (process.env.NODE_ENV !== 'production') {
-  app.use(express.static(path.join(__dirname, '..', 'public')));
-}
+// Serve static files dari dist/ (UI build) dan ui/public/
+app.use(express.static(path.join(__dirname, '..', 'dist')));
+app.use(express.static(path.join(__dirname, '..', 'ui', 'public')));
 
 app.get('/api/health', (req, res) => res.json({ ok: true, ts: Date.now() }));
 
