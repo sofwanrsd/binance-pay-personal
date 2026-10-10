@@ -172,3 +172,12 @@ Unit test mencakup logika matching: income/keluar, toleransi nominal, window wak
 - API Key cukup permission **Enable Reading** — jangan aktifkan trading/withdraw
 - Server stateless — tidak ada database, tidak ada poller; pengecekan via `/check-payment` on-demand
 - Untuk lihat semua history > 7 hari, pakai mode `full` di `/debug/pay-history`
+
+## Kontribusi
+
+Kontribusi, saran fitur, perbaikan bug, issue, dan pull request sangat terbuka bebas bagi siapa saja yang ingin mengembangkan proyek ini lebih lanjut. Silakan fork repositori ini dan ajukan pull request.
+
+## Lisensi
+
+Proyek ini dilisensikan di bawah lisensi MIT. Lihat file [LICENSE](LICENSE) untuk detail lengkap.
+
